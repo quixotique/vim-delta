@@ -20,45 +20,47 @@ set cpo&vim
 " PUBLIC INTERFACE
 
 " Default key bindings, only set where no binding already has been defined.
-if !hasmapto('<Plug>DiffsCloseAll')
-  nmap <unique> <Leader>\ <Plug>DiffsCloseAll
-  nmap <unique> <Leader>0 <Plug>DiffsCloseAll
-endif
-if !hasmapto('<Plug>DiffsOpenWorkingParent')
-  nmap <unique> <Leader>w <Plug>DiffsOpenWorkingParent
-endif
-if !hasmapto('<Plug>DiffsCloseWorkingParent')
-  nmap <unique> <Leader>W <Plug>DiffsCloseWorkingParent
-endif
-if !hasmapto('<Plug>DiffsOpenCurrentTrunk')
-  nmap <unique> <Leader>t <Plug>DiffsOpenCurrentTrunk
-endif
-if !hasmapto('<Plug>DiffsCloseCurrentTrunk')
-  nmap <unique> <Leader>T <Plug>DiffsCloseCurrentTrunk
-endif
-if !hasmapto('<Plug>DiffsOpenLastMergedTrunk')
-  nmap <unique> <Leader>m <Plug>DiffsOpenLastMergedTrunk
-endif
-if !hasmapto('<Plug>DiffsCloseLastMergedTrunk')
-  nmap <unique> <Leader>M <Plug>DiffsCloseLastMergedTrunk
-endif
-if !hasmapto('<Plug>DiffsOpenBranchOrigin')
-  nmap <unique> <Leader>b <Plug>DiffsOpenBranchOrigin
-endif
-if !hasmapto('<Plug>DiffsCloseBranchOrigin')
-  nmap <unique> <Leader>B <Plug>DiffsCloseBranchOrigin
-endif
-if !hasmapto('<Plug>DiffsOpenNewestRelease')
-  nmap <unique> <Leader>n <Plug>DiffsOpenNewestRelease
-endif
-if !hasmapto('<Plug>DiffsCloseNewestRelease')
-  nmap <unique> <Leader>N <Plug>DiffsCloseNewestRelease
-endif
-if !hasmapto('<Plug>DiffsOpenPriorRelease')
-  nmap <unique> <Leader>p <Plug>DiffsOpenPriorRelease
-endif
-if !hasmapto('<Plug>DiffsClosePriorRelease')
-  nmap <unique> <Leader>P <Plug>DiffsClosePriorRelease
+if !exists('no_plugin_maps') && !exists('no_tuenti_tools_maps')
+  if !hasmapto('<Plug>DiffsCloseAll')
+	nmap <unique> <Leader>\ <Plug>DiffsCloseAll
+	nmap <unique> <Leader>0 <Plug>DiffsCloseAll
+  endif
+  if !hasmapto('<Plug>DiffsOpenWorkingParent')
+	nmap <unique> <Leader>w <Plug>DiffsOpenWorkingParent
+  endif
+  if !hasmapto('<Plug>DiffsCloseWorkingParent')
+	nmap <unique> <Leader>W <Plug>DiffsCloseWorkingParent
+  endif
+  if !hasmapto('<Plug>DiffsOpenCurrentTrunk')
+	nmap <unique> <Leader>t <Plug>DiffsOpenCurrentTrunk
+  endif
+  if !hasmapto('<Plug>DiffsCloseCurrentTrunk')
+	nmap <unique> <Leader>T <Plug>DiffsCloseCurrentTrunk
+  endif
+  if !hasmapto('<Plug>DiffsOpenLastMergedTrunk')
+	nmap <unique> <Leader>m <Plug>DiffsOpenLastMergedTrunk
+  endif
+  if !hasmapto('<Plug>DiffsCloseLastMergedTrunk')
+	nmap <unique> <Leader>M <Plug>DiffsCloseLastMergedTrunk
+  endif
+  if !hasmapto('<Plug>DiffsOpenBranchOrigin')
+	nmap <unique> <Leader>b <Plug>DiffsOpenBranchOrigin
+  endif
+  if !hasmapto('<Plug>DiffsCloseBranchOrigin')
+	nmap <unique> <Leader>B <Plug>DiffsCloseBranchOrigin
+  endif
+  if !hasmapto('<Plug>DiffsOpenNewestRelease')
+	nmap <unique> <Leader>n <Plug>DiffsOpenNewestRelease
+  endif
+  if !hasmapto('<Plug>DiffsCloseNewestRelease')
+	nmap <unique> <Leader>N <Plug>DiffsCloseNewestRelease
+  endif
+  if !hasmapto('<Plug>DiffsOpenPriorRelease')
+	nmap <unique> <Leader>p <Plug>DiffsOpenPriorRelease
+  endif
+  if !hasmapto('<Plug>DiffsClosePriorRelease')
+	nmap <unique> <Leader>P <Plug>DiffsClosePriorRelease
+  endif
 endif
 
 " Global maps, available for your own key bindings.
