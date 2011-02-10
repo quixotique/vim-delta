@@ -147,7 +147,7 @@ func s:closeTrunkDiff()
 endfunc
 
 func s:openNewestReleaseDiff()
-  let rel = s:newestHgReleaseName()
+  let rel = g:newestHgReleaseName()
   if rel != ''
     call s:openHgDiff('newestRelease', rel, rel)
   endif
@@ -169,14 +169,11 @@ endfunc
 " ------------------------------------------------------------------------------
 " PRIVATE FUNCTIONS
 
-" Return a list of the names of all Mercurial release branches, in lexical
-" sorted order.
+" Return a list of the names of all Mercurial release branches in the current
+" file's repository, in lexical sorted order.
 func s:allHgReleaseNames()
-  let rels = split(system('hg branches | awk ''$1~/^release-/{print $1}'''), "\n")
-  if empty(rels)
-    return ''
-  endif
-  return sort(rels)
+  let dir = expand('%:h')
+  return sort(split(system('cd '.shellescape(dir).'&& hg branches | awk ''$1~/^release-/{print $1}'''), "\n"))
 endfunc
 
 " Extract a release date from a release name in the form "release-DATE", or
@@ -190,7 +187,7 @@ endfunc
 
 " Return the latest Mercurial release name, or '' if there are no release
 " branches.
-func s:newestHgReleaseName()
+func g:newestHgReleaseName()
   return get(s:allHgReleaseNames(), -1, '')
 endfunc
 
@@ -203,12 +200,14 @@ endfunc
 " Return a list of Mercurial revision IDs (nodes) determined by the given
 " hg log options, in reverse chronological order (most recent first).
 func s:getHgRevisions(hgLogOpts)
-  return split(system('hg log --template "{node}\n" '.a:hgLogOpts), "\n")
+  let dir = expand('%:h')
+  return split(system('cd '.shellescape(dir).' && hg log --template "{node}\n" '.a:hgLogOpts), "\n")
 endfunc
 
 " Return much information about a specific revision.
-func s:getHtRevisionInfo(rev)
-  let lines = split(system('hg log --template "{rev}\n{node}\n{node|short}\n{branches}\n{parents}\n{tags}\n{author}\n{author|user}\n{date|date}\n{date|isodate}\n{date|shortdate}\n{desc}\n" --rev '.a:rev), "\n")
+func s:getHgRevisionInfo(rev)
+  let dir = expand('%:h')
+  let lines = split(system('cd '.shellescape(dir).' && hg log --template "{rev}\n{node}\n{node|short}\n{branches}\n{parents}\n{tags}\n{author}\n{author|user}\n{date|date}\n{date|isodate}\n{date|shortdate}\n{desc}\n" --rev '.a:rev), "\n")
   let info = {}
   let info.rev = remove(lines, 0)
   let info.node = remove(lines, 0)
@@ -237,10 +236,10 @@ endfunc
 func s:latestHgDefaultMergeRevision()
   let merges = s:getHgRevisions('--branch . --only-merges')
   for rev in merges
-    let info = s:getHtRevisionInfo(rev)
+    let info = s:getHgRevisionInfo(rev)
 	if info.branch != 'default'
 	  for parentrev in info.parentrevs
-		let parentinfo = s:getHtRevisionInfo(parentrev)
+		let parentinfo = s:getHgRevisionInfo(parentrev)
 		if parentinfo.branch == 'default'
 		  return parentinfo.node
 		endif
@@ -257,7 +256,7 @@ endfunc
 " Param: label If set, replaces diffName as the displayed label
 "
 func s:openHgDiff(diffname, rev, label)
-  let info = s:getHtRevisionInfo(a:rev)
+  let info = s:getHgRevisionInfo(a:rev)
   let annotation = info.shortnode.' '.info.user.' '.info.shortdate
   call s:openDiff(a:diffname, '!hg cat -r '.a:rev.' #', annotation, a:label)
 endfunc
