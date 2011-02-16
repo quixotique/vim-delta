@@ -169,11 +169,35 @@ endfunc
 " ------------------------------------------------------------------------------
 " PRIVATE FUNCTIONS
 
+" If the given Mercurial output lines contain any error message, or the command
+" itself returned an error exit status, then display an error message and quote
+" any error message from Mercurial, then return 1 to indicate an error
+" condition.  Otherwise return 0.
+func s:displayHgError(message, lines)
+  let errorlines = filter(copy(a:lines), 'v:val =~ "^\\*\\*\\*"')
+  if v:shell_error || len(errorlines)
+	echohl ErrorMsg
+    echomsg a:message
+  	echohl None
+	if len(errorlines)
+	  echohl WarningMsg
+	  echomsg join(errorlines, "\n")
+	  echohl None
+	endif
+	return 1
+  endif
+  return 0
+endfunc
+
 " Return a list of the names of all Mercurial release branches in the current
 " file's repository, in lexical sorted order.
 func s:allHgReleaseNames()
   let dir = expand('%:h')
-  return sort(split(system('cd '.shellescape(dir).'&& hg --config defaults.branches= branches | awk ''$1~/^release-/{print $1}'''), "\n"))
+  let lines = split(system('cd '.shellescape(dir).'&& hg --config defaults.branches= branches | awk ''$1~/^release-/{print $1}'''), "\n")
+  if s:displayHgError('Could not get list of branches', lines)
+    return []
+  endif
+  return sort(lines)
 endfunc
 
 " Extract a release date from a release name in the form "release-DATE", or
@@ -201,32 +225,46 @@ endfunc
 " hg log options, in reverse chronological order (most recent first).
 func s:getHgRevisions(hgLogOpts)
   let dir = expand('%:h')
-  return split(system('cd '.shellescape(dir).' && hg --config defaults.log= log --template "{node}\n" '.a:hgLogOpts), "\n")
+  let lines = split(system('cd '.shellescape(dir).' && hg --config defaults.log= log --template "{node}\n" '.a:hgLogOpts), "\n")
+  if s:displayHgError('Could not get revisions from "hg log '.a:hgLogOpts.'"', lines)
+    return []
+  endif
+  return lines
 endfunc
 
 " Return much information about a specific revision.
 func s:getHgRevisionInfo(rev)
-  let dir = expand('%:h')
-  let lines = split(system('cd '.shellescape(dir).' && hg --config defaults.log= log --template "{rev}\n{node}\n{node|short}\n{branches}\n{parents}\n{tags}\n{author}\n{author|user}\n{date|date}\n{date|isodate}\n{date|shortdate}\n{desc}\n" --rev '.a:rev), "\n")
   let info = {}
-  let info.rev = remove(lines, 0)
-  let info.node = remove(lines, 0)
-  let info.shortnode = remove(lines, 0)
-  let info.branch = remove(lines, 0)
-  if info.branch == ''
-    let info.branch = 'default'
+  let dir = expand('%:h')
+  let lines = split(system('cd '.shellescape(dir).' && hg --config defaults.log= log --template "{rev}\n{node}\n{node|short}\n{branches}\n{parents}\n{tags}\n{author}\n{author|user}\n{date|date}\n{date|isodate}\n{date|shortdate}\nDESCRIPTION\n{desc}\n" --rev '.a:rev), "\n")
+  if !s:displayHgError('Could not get information for revision "'.a:rev.'"', lines)
+	if len(lines) < 13 || lines[11] != 'DESCRIPTION'
+	  echoerr 'Malformed output from "hg log":'
+	  for line in lines
+	    echomsg line
+	  endfor
+	else
+	  let info.rev = remove(lines, 0)
+	  let info.node = remove(lines, 0)
+	  let info.shortnode = remove(lines, 0)
+	  let info.branch = remove(lines, 0)
+	  if info.branch == ''
+		let info.branch = 'default'
+	  endif
+	  let parents = remove(lines, 0)
+	  let info.parents = map(split(parents), 'split(v:val,":")[1]')
+	  let info.parentrevs = map(split(parents), 'split(v:val,":")[0]')
+	  let info.tags = split(remove(lines, 0))
+	  let info.author = remove(lines, 0)
+	  let info.user = remove(lines, 0)
+	  let info.date = remove(lines, 0)
+	  let info.isodate = remove(lines, 0)
+	  let info.shortdate = remove(lines, 0)
+	  call remove(lines, 0)
+	  let info.summary = lines[0]
+	  let info.description = join(lines, "\n")
+	endif
   endif
-  let parents = remove(lines, 0)
-  let info.parents = map(split(parents), 'split(v:val,":")[1]')
-  let info.parentrevs = map(split(parents), 'split(v:val,":")[0]')
-  let info.tags = split(remove(lines, 0))
-  let info.author = remove(lines, 0)
-  let info.user = remove(lines, 0)
-  let info.date = remove(lines, 0)
-  let info.isodate = remove(lines, 0)
-  let info.shortdate = remove(lines, 0)
-  let info.summary = lines[0]
-  let info.description = join(lines, "\n")
   return info
 endfunc
 
@@ -237,9 +275,15 @@ func s:latestHgDefaultMergeRevision()
   let merges = s:getHgRevisions('--branch . --only-merges')
   for rev in merges
     let info = s:getHgRevisionInfo(rev)
+	if !len(info)
+	  return ''
+	endif
 	if info.branch != 'default'
 	  for parentrev in info.parentrevs
 		let parentinfo = s:getHgRevisionInfo(parentrev)
+		if !len(parentinfo)
+		  return ''
+		endif
 		if parentinfo.branch == 'default'
 		  return parentinfo.node
 		endif
@@ -257,8 +301,10 @@ endfunc
 "
 func s:openHgDiff(diffname, rev, label)
   let info = s:getHgRevisionInfo(a:rev)
-  let annotation = info.shortnode.' '.info.user.' '.info.shortdate
-  call s:openDiff(a:diffname, '!hg --config defaults.cat= cat -r '.a:rev.' #', annotation, a:label)
+  if len(info)
+	let annotation = info.shortnode.' '.info.user.' '.info.shortdate
+	call s:openDiff(a:diffname, '!hg --config defaults.cat= cat -r '.a:rev.' #', annotation, a:label)
+  endif
 endfunc
 
 " Open a new diff window containing the contents of the given file, which is
