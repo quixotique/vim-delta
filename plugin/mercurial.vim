@@ -173,7 +173,7 @@ endfunc
 " file's repository, in lexical sorted order.
 func s:allHgReleaseNames()
   let dir = expand('%:h')
-  return sort(split(system('cd '.shellescape(dir).'&& hg branches | awk ''$1~/^release-/{print $1}'''), "\n"))
+  return sort(split(system('cd '.shellescape(dir).'&& hg --config defaults.branches= branches | awk ''$1~/^release-/{print $1}'''), "\n"))
 endfunc
 
 " Extract a release date from a release name in the form "release-DATE", or
@@ -201,13 +201,13 @@ endfunc
 " hg log options, in reverse chronological order (most recent first).
 func s:getHgRevisions(hgLogOpts)
   let dir = expand('%:h')
-  return split(system('cd '.shellescape(dir).' && hg log --template "{node}\n" '.a:hgLogOpts), "\n")
+  return split(system('cd '.shellescape(dir).' && hg --config defaults.log= log --template "{node}\n" '.a:hgLogOpts), "\n")
 endfunc
 
 " Return much information about a specific revision.
 func s:getHgRevisionInfo(rev)
   let dir = expand('%:h')
-  let lines = split(system('cd '.shellescape(dir).' && hg log --template "{rev}\n{node}\n{node|short}\n{branches}\n{parents}\n{tags}\n{author}\n{author|user}\n{date|date}\n{date|isodate}\n{date|shortdate}\n{desc}\n" --rev '.a:rev), "\n")
+  let lines = split(system('cd '.shellescape(dir).' && hg --config defaults.log= log --template "{rev}\n{node}\n{node|short}\n{branches}\n{parents}\n{tags}\n{author}\n{author|user}\n{date|date}\n{date|isodate}\n{date|shortdate}\n{desc}\n" --rev '.a:rev), "\n")
   let info = {}
   let info.rev = remove(lines, 0)
   let info.node = remove(lines, 0)
@@ -258,7 +258,7 @@ endfunc
 func s:openHgDiff(diffname, rev, label)
   let info = s:getHgRevisionInfo(a:rev)
   let annotation = info.shortnode.' '.info.user.' '.info.shortdate
-  call s:openDiff(a:diffname, '!hg cat -r '.a:rev.' #', annotation, a:label)
+  call s:openDiff(a:diffname, '!hg --config defaults.cat= cat -r '.a:rev.' #', annotation, a:label)
 endfunc
 
 " Open a new diff window containing the contents of the given file, which is
