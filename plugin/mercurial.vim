@@ -1,4 +1,5 @@
 " Mercurial vim diff mode functions.
+" vim: et ts=8 sts=2 sw=2
 "
 " Copyright 2011 Tuenti Technologies S.L.
 " License: This file can only be stored on servers belonging to Tuenti Technologies S.L.
@@ -22,62 +23,79 @@ set cpo&vim
 " Default key bindings, only set where no binding already has been defined.
 if !exists('no_plugin_maps') && !exists('no_tuenti_tools_maps')
   if !hasmapto('<Plug>DiffsCloseAll')
-	nmap <unique> <Leader>\ <Plug>DiffsCloseAll
-	nmap <unique> <Leader>0 <Plug>DiffsCloseAll
+    nmap <unique> <Leader>\ <Plug>DiffsCloseAll
+    nmap <unique> <Leader>0 <Plug>DiffsCloseAll
+  endif
+  if !hasmapto('<Plug>DiffsCloseWindow')
+    nmap <unique> <Leader>- <Plug>DiffsCloseWindow
   endif
   if !hasmapto('<Plug>DiffsOpenWorkingParent')
-	nmap <unique> <Leader>w <Plug>DiffsOpenWorkingParent
+    nmap <unique> <Leader>w <Plug>DiffsOpenWorkingParent
   endif
   if !hasmapto('<Plug>DiffsCloseWorkingParent')
-	nmap <unique> <Leader>W <Plug>DiffsCloseWorkingParent
+    nmap <unique> <Leader>W <Plug>DiffsCloseWorkingParent
   endif
   if !hasmapto('<Plug>DiffsOpenCurrentTrunk')
-	nmap <unique> <Leader>t <Plug>DiffsOpenCurrentTrunk
+    nmap <unique> <Leader>t <Plug>DiffsOpenCurrentTrunk
   endif
   if !hasmapto('<Plug>DiffsCloseCurrentTrunk')
-	nmap <unique> <Leader>T <Plug>DiffsCloseCurrentTrunk
+    nmap <unique> <Leader>T <Plug>DiffsCloseCurrentTrunk
   endif
   if !hasmapto('<Plug>DiffsOpenLastMergedTrunk')
-	nmap <unique> <Leader>m <Plug>DiffsOpenLastMergedTrunk
+    nmap <unique> <Leader>m <Plug>DiffsOpenLastMergedTrunk
   endif
   if !hasmapto('<Plug>DiffsCloseLastMergedTrunk')
-	nmap <unique> <Leader>M <Plug>DiffsCloseLastMergedTrunk
+    nmap <unique> <Leader>M <Plug>DiffsCloseLastMergedTrunk
   endif
   if !hasmapto('<Plug>DiffsOpenBranchOrigin')
-	nmap <unique> <Leader>b <Plug>DiffsOpenBranchOrigin
+    nmap <unique> <Leader>b <Plug>DiffsOpenBranchOrigin
   endif
   if !hasmapto('<Plug>DiffsCloseBranchOrigin')
-	nmap <unique> <Leader>B <Plug>DiffsCloseBranchOrigin
+    nmap <unique> <Leader>B <Plug>DiffsCloseBranchOrigin
   endif
   if !hasmapto('<Plug>DiffsOpenNewestRelease')
-	nmap <unique> <Leader>n <Plug>DiffsOpenNewestRelease
+    nmap <unique> <Leader>n <Plug>DiffsOpenNewestRelease
   endif
   if !hasmapto('<Plug>DiffsCloseNewestRelease')
-	nmap <unique> <Leader>N <Plug>DiffsCloseNewestRelease
+    nmap <unique> <Leader>N <Plug>DiffsCloseNewestRelease
   endif
   if !hasmapto('<Plug>DiffsOpenPriorRelease')
-	nmap <unique> <Leader>p <Plug>DiffsOpenPriorRelease
+    nmap <unique> <Leader>p <Plug>DiffsOpenPriorRelease
   endif
   if !hasmapto('<Plug>DiffsClosePriorRelease')
-	nmap <unique> <Leader>P <Plug>DiffsClosePriorRelease
+    nmap <unique> <Leader>P <Plug>DiffsClosePriorRelease
+  endif
+  if !hasmapto('<Plug>DiffsCloseLogRevision')
+    nmap <unique> <Leader>x <Plug>DiffsCloseLogRevision
+    nmap <unique> <Leader>X <Plug>DiffsCloseLogRevision
+  endif
+  if !hasmapto('<Plug>OpenLogWindow')
+    nmap <unique> <Leader>l <Plug>OpenLogWindow
+  endif
+  if !hasmapto('<Plug>CloseLogWindow')
+    nmap <unique> <Leader>L <Plug>CloseLogWindow
   endif
 endif
 
 " Global maps, available for your own key bindings.
 "
-noremap <silent> <unique> <script> <Plug>DiffsCloseAll :call <SID>closeAllDiffs()<CR>
-noremap <silent> <unique> <script> <Plug>DiffsOpenWorkingParent :call <SID>openWorkingParentDiff()<CR>
-noremap <silent> <unique> <script> <Plug>DiffsCloseWorkingParent :call <SID>closeWorkingParentDiff()<CR>
-noremap <silent> <unique> <script> <Plug>DiffsOpenCurrentTrunk :call <SID>openTrunkDiff()<CR>
-noremap <silent> <unique> <script> <Plug>DiffsCloseCurrentTrunk :call <SID>closeTrunkDiff()<CR>
-noremap <silent> <unique> <script> <Plug>DiffsOpenLastMergedTrunk :call <SID>openLastMergedTrunkDiff()<CR>
-noremap <silent> <unique> <script> <Plug>DiffsCloseLastMergedTrunk :call <SID>closeLastMergedTrunkDiff()<CR>
-noremap <silent> <unique> <script> <Plug>DiffsOpenBranchOrigin :call <SID>openBranchOriginDiff()<CR>
-noremap <silent> <unique> <script> <Plug>DiffsCloseBranchOrigin :call <SID>closeBranchOriginDiff()<CR>
-noremap <silent> <unique> <script> <Plug>DiffsOpenPriorRelease :call <SID>openPriorReleaseDiff()<CR>
-noremap <silent> <unique> <script> <Plug>DiffsClosePriorRelease :call <SID>closePriorReleaseDiff()<CR>
-noremap <silent> <unique> <script> <Plug>DiffsOpenNewestRelease :call <SID>openNewestReleaseDiff()<CR>
-noremap <silent> <unique> <script> <Plug>DiffsCloseNewestRelease :call <SID>closeNewestReleaseDiff()<CR>
+noremap <silent> <unique> <Plug>DiffsCloseAll :call <SID>closeAllDiffs()<CR>
+noremap <silent> <unique> <Plug>DiffsCloseWindow :call <SID>closeCurrentDiff()<CR>
+noremap <silent> <unique> <Plug>DiffsOpenWorkingParent :call <SID>openWorkingParentDiff()<CR>
+noremap <silent> <unique> <Plug>DiffsCloseWorkingParent :call <SID>closeWorkingParentDiff()<CR>
+noremap <silent> <unique> <Plug>DiffsOpenCurrentTrunk :call <SID>openTrunkDiff()<CR>
+noremap <silent> <unique> <Plug>DiffsCloseCurrentTrunk :call <SID>closeTrunkDiff()<CR>
+noremap <silent> <unique> <Plug>DiffsOpenLastMergedTrunk :call <SID>openLastMergedTrunkDiff()<CR>
+noremap <silent> <unique> <Plug>DiffsCloseLastMergedTrunk :call <SID>closeLastMergedTrunkDiff()<CR>
+noremap <silent> <unique> <Plug>DiffsOpenBranchOrigin :call <SID>openBranchOriginDiff()<CR>
+noremap <silent> <unique> <Plug>DiffsCloseBranchOrigin :call <SID>closeBranchOriginDiff()<CR>
+noremap <silent> <unique> <Plug>DiffsOpenPriorRelease :call <SID>openPriorReleaseDiff()<CR>
+noremap <silent> <unique> <Plug>DiffsClosePriorRelease :call <SID>closePriorReleaseDiff()<CR>
+noremap <silent> <unique> <Plug>DiffsOpenNewestRelease :call <SID>openNewestReleaseDiff()<CR>
+noremap <silent> <unique> <Plug>DiffsCloseNewestRelease :call <SID>closeNewestReleaseDiff()<CR>
+noremap <silent> <unique> <Plug>DiffsCloseLogRevision :call <SID>closeLogRevisionDiff()<CR>
+noremap <silent> <unique> <Plug>OpenLogWindow :call g:openLogWindow()<CR>
+noremap <silent> <unique> <Plug>CloseLogWindow :call g:closeLogWindow()<CR>
 
 " Whenever any buffer (window) goes away, if there are no more diff windows
 " remaining, then turn off diff mode in the principal buffer.
@@ -86,7 +104,7 @@ autocmd BufHidden * call s:cleanUpDiffs()
 " ------------------------------------------------------------------------------
 " APPLICATION FUNCTIONS
 
-let s:allDiffNames = ['workingParent', 'branchOrigin', 'mergedTrunk', 'currentTrunk', 'priorRelease', 'newestRelease']
+let s:allDiffNames = ['workingParent', 'branchOrigin', 'mergedTrunk', 'currentTrunk', 'priorRelease', 'newestRelease', 'logRevision']
 
 func s:closeAllDiffs()
   for diffname in s:allDiffNames
@@ -94,21 +112,41 @@ func s:closeAllDiffs()
   endfor
 endfunc
 
+func s:closeCurrentDiff()
+  let curbuf = bufnr("%")
+  for diffname in s:allDiffNames
+    let varname = "t:".diffname."DiffBuffer"
+    if exists(varname) && eval(varname) == curbuf
+      call s:closeDiff(diffname)
+    endif
+  endfor
+endfunc
+
 func s:cleanUpDiffs()
   if exists('t:turnOffDiff') && t:turnOffDiff == bufnr('%')
     " This is a kludge, to work around a bug that the :diffoff! below does not turn
-	" off diff mode in the buffer that is being left.
+    " off diff mode in the buffer that is being left.
     diffoff
-	unlet t:turnOffDiff
+    unlet t:turnOffDiff
+    if exists('b:noDiffWrapMode')
+      call s:setWrapMode(b:noDiffWrapMode)
+    else
+      call s:setWrapMode()
+    endif
   endif
   if !s:testAnyDiffExists()
     "echo 'exists("t:origDiffBuffer") = ' . exists('t:origDiffBuffer') . ', bufnr("%") = ' . bufnr('%')
-	"echo 'wah'
-	diffoff!
+    "echo 'wah'
+    diffoff!
+    if exists('b:noDiffWrapMode')
+      call s:setWrapMode(b:noDiffWrapMode)
+    else
+      call s:setWrapMode()
+    endif
     if exists('t:origDiffBuffer')
-	  let t:turnOffDiff = t:origDiffBuffer
-	  unlet! t:origDiffBuffer
-	endif
+      let t:turnOffDiff = t:origDiffBuffer
+      unlet! t:origDiffBuffer
+    endif
   endif
 endfunc
 
@@ -147,9 +185,9 @@ func s:closeTrunkDiff()
 endfunc
 
 func s:openNewestReleaseDiff()
-  let rel = g:newestHgReleaseName()
-  if rel != ''
-    call s:openHgDiff('newestRelease', rel, rel)
+  let rev = g:newestHgReleaseName()
+  if rev != ''
+    call s:openHgDiff('newestRelease', rev, rev)
   endif
 endfunc
 func s:closeNewestReleaseDiff()
@@ -157,9 +195,9 @@ func s:closeNewestReleaseDiff()
 endfunc
 
 func s:openPriorReleaseDiff()
-  let rel = s:priorHgReleaseName()
-  if rel != ''
-    call s:openHgDiff('priorRelease', rel, rel)
+  let rev = s:priorHgReleaseName()
+  if rev != ''
+    call s:openHgDiff('priorRelease', rev, rev)
   endif
 endfunc
 func s:closePriorReleaseDiff()
@@ -176,15 +214,15 @@ endfunc
 func s:displayHgError(message, lines)
   let errorlines = filter(copy(a:lines), 'v:val =~ "^\\*\\*\\*"')
   if v:shell_error || len(errorlines)
-	echohl ErrorMsg
+    echohl ErrorMsg
     echomsg a:message
-  	echohl None
-	if len(errorlines)
-	  echohl WarningMsg
-	  echomsg join(errorlines, "\n")
-	  echohl None
-	endif
-	return 1
+    echohl None
+    if len(errorlines)
+      echohl WarningMsg
+      echomsg join(errorlines, "\n")
+      echohl None
+    endif
+    return 1
   endif
   return 0
 endfunc
@@ -192,7 +230,7 @@ endfunc
 " Return a list of the names of all Mercurial release branches in the current
 " file's repository, in lexical sorted order.
 func s:allHgReleaseNames()
-  let dir = expand('%:h')
+  let dir = s:getHgCwd()
   let lines = split(system('cd '.shellescape(dir).'&& hg --config defaults.branches= branches | awk ''$1~/^release-/{print $1}'''), "\n")
   if s:displayHgError('Could not get list of branches', lines)
     return []
@@ -224,7 +262,7 @@ endfunc
 " Return a list of Mercurial revision IDs (nodes) determined by the given
 " hg log options, in reverse chronological order (most recent first).
 func s:getHgRevisions(hgLogOpts)
-  let dir = expand('%:h')
+  let dir = s:getHgCwd()
   let lines = split(system('cd '.shellescape(dir).' && hg --config defaults.log= log --template "{node}\n" '.a:hgLogOpts), "\n")
   if s:displayHgError('Could not get revisions from "hg log '.a:hgLogOpts.'"', lines)
     return []
@@ -235,35 +273,35 @@ endfunc
 " Return much information about a specific revision.
 func s:getHgRevisionInfo(rev)
   let info = {}
-  let dir = expand('%:h')
+  let dir = s:getHgCwd()
   let lines = split(system('cd '.shellescape(dir).' && hg --config defaults.log= log --template "{rev}\n{node}\n{node|short}\n{branches}\n{parents}\n{tags}\n{author}\n{author|user}\n{date|date}\n{date|isodate}\n{date|shortdate}\nDESCRIPTION\n{desc}\n" --rev '.a:rev), "\n")
   if !s:displayHgError('Could not get information for revision "'.a:rev.'"', lines)
-	if len(lines) < 13 || lines[11] != 'DESCRIPTION'
-	  echoerr 'Malformed output from "hg log":'
-	  for line in lines
-	    echomsg line
-	  endfor
-	else
-	  let info.rev = remove(lines, 0)
-	  let info.node = remove(lines, 0)
-	  let info.shortnode = remove(lines, 0)
-	  let info.branch = remove(lines, 0)
-	  if info.branch == ''
-		let info.branch = 'default'
-	  endif
-	  let parents = remove(lines, 0)
-	  let info.parents = map(split(parents), 'split(v:val,":")[1]')
-	  let info.parentrevs = map(split(parents), 'split(v:val,":")[0]')
-	  let info.tags = split(remove(lines, 0))
-	  let info.author = remove(lines, 0)
-	  let info.user = remove(lines, 0)
-	  let info.date = remove(lines, 0)
-	  let info.isodate = remove(lines, 0)
-	  let info.shortdate = remove(lines, 0)
-	  call remove(lines, 0)
-	  let info.summary = lines[0]
-	  let info.description = join(lines, "\n")
-	endif
+    if len(lines) < 13 || lines[11] != 'DESCRIPTION'
+      echoerr 'Malformed output from "hg log":'
+      for line in lines
+        echomsg line
+      endfor
+    else
+      let info.rev = remove(lines, 0)
+      let info.node = remove(lines, 0)
+      let info.shortnode = remove(lines, 0)
+      let info.branch = remove(lines, 0)
+      if info.branch == ''
+        let info.branch = 'default'
+      endif
+      let parents = remove(lines, 0)
+      let info.parents = map(split(parents), 'split(v:val,":")[1]')
+      let info.parentrevs = map(split(parents), 'split(v:val,":")[0]')
+      let info.tags = split(remove(lines, 0))
+      let info.author = remove(lines, 0)
+      let info.user = remove(lines, 0)
+      let info.date = remove(lines, 0)
+      let info.isodate = remove(lines, 0)
+      let info.shortdate = remove(lines, 0)
+      call remove(lines, 0)
+      let info.summary = lines[0]
+      let info.description = join(lines, "\n")
+    endif
   endif
   return info
 endfunc
@@ -275,20 +313,20 @@ func s:latestHgDefaultMergeRevision()
   let merges = s:getHgRevisions('--branch . --only-merges')
   for rev in merges
     let info = s:getHgRevisionInfo(rev)
-	if !len(info)
-	  return ''
-	endif
-	if info.branch != 'default'
-	  for parentrev in info.parentrevs
-		let parentinfo = s:getHgRevisionInfo(parentrev)
-		if !len(parentinfo)
-		  return ''
-		endif
-		if parentinfo.branch == 'default'
-		  return parentinfo.node
-		endif
-	  endfor
-	endif
+    if !len(info)
+      return ''
+    endif
+    if info.branch != 'default'
+      for parentrev in info.parentrevs
+        let parentinfo = s:getHgRevisionInfo(parentrev)
+        if !len(parentinfo)
+          return ''
+        endif
+        if parentinfo.branch == 'default'
+          return parentinfo.node
+        endif
+      endfor
+    endif
   endfor
   return ''
 endfunc
@@ -302,8 +340,8 @@ endfunc
 func s:openHgDiff(diffname, rev, label)
   let info = s:getHgRevisionInfo(a:rev)
   if len(info)
-	let annotation = info.shortnode.' '.info.user.' '.info.shortdate
-	call s:openDiff(a:diffname, '!hg --config defaults.cat= cat -r '.a:rev.' #', annotation, a:label)
+    let annotation = info.shortnode.' '.info.user.' '.info.shortdate
+    call s:openDiff(a:diffname, '!hg --config defaults.cat= cat -r '.a:rev.' #', annotation, a:label)
   endif
 endfunc
 
@@ -318,64 +356,167 @@ endfunc
 "
 func s:openDiff(diffname, readArg, annotation, label)
   "echo "openDiff(".string(a:diffname).', '.string(a:readArg).', '.string(a:annotation).', '.string(a:label).')'
-  let varname = "t:".a:diffname."DiffBuf"
+  let varname = "t:".a:diffname."DiffBuffer"
   if exists(varname)
     diffupdate
+    call s:setWrapMode()
   else
     if exists("t:origDiffBuffer")
-      exe t:origDiffBuffer 'buffer'
-	else
-	  let t:origDiffBuffer = bufnr("%")
+      exe bufwinnr(t:origDiffBuffer) 'wincmd w'
+    elseif exists("t:hgLogFileBuffer")
+      exe bufwinnr(t:hgLogFileBuffer) 'wincmd w'
+    else
+      let t:origDiffBuffer = bufnr("%")
     endif
-  	let ft = &filetype
-  	vnew
+    let b:noDiffWrapMode = &l:wrap
+    call s:setWrapMode(0)
+    let ft = &filetype
+    let filedir = expand('%:h')
+    vnew
+    let b:fileDir = filedir
+    call s:setWrapMode(0)
     exe 'let' varname "=" bufnr("%")
-	let displayName = (a:label != '') ? a:label : a:diffname
-	if a:annotation != ''
-	  let displayName .= ' '.a:annotation
-	endif
-	silent exe 'file' fnameescape(displayName)
-	silent exe '1read' a:readArg
-	1d
-    set buftype=nofile
-  	let &filetype = ft
-    set scrollbind
-    set noswapfile
-    set bufhidden=delete
-	diffthis
-	augroup TuentiMercurialDiff
+    let displayName = (a:label != '') ? a:label : a:diffname
+    if a:annotation != ''
+      let displayName .= ' '.a:annotation
+    endif
+    silent exe 'file' fnameescape(displayName)
+    silent exe '1read' a:readArg
+    1d
+    let &l:filetype = ft
+    setlocal buftype=nofile
+    setlocal nomodifiable
+    setlocal noswapfile
+    setlocal bufhidden=delete
+    setlocal scrollbind
+    diffthis
+    augroup TuentiMercurialDiff
       exe 'autocmd BufDelete <buffer> call s:cleanUpDiff('.string(a:diffname).')'
-	augroup END
+    augroup END
     wincmd x
-	augroup TuentiMercurialDiff
+    setlocal scrollbind
+    augroup TuentiMercurialDiff
       autocmd BufWinLeave <buffer> nested call s:closeAllDiffs()
-	  autocmd BufWinEnter <buffer> call s:cleanUpDiffs()
-	augroup END
-	diffthis
+      autocmd BufWinEnter <buffer> call s:cleanUpDiffs()
+    augroup END
+    diffthis
   endif
 endfunc
 
 func s:closeDiff(diffname)
-  let varname = 't:'.a:diffname.'DiffBuf'
+  let varname = 't:'.a:diffname.'DiffBuffer'
   if exists(varname)
+    " delete the buffer and let the BufDelete autocmd do the clean-up
     exe 'exe' varname '"bdelete"'
   endif
 endfunc
 
 func s:cleanUpDiff(diffname)
-  let varname = 't:'.a:diffname.'DiffBuf'
+  let varname = 't:'.a:diffname.'DiffBuffer'
   exe 'unlet!' varname
   call s:cleanUpDiffs()
 endfunc
 
 func s:testAnyDiffExists()
   for diffname in s:allDiffNames
-    let varname = 't:'.diffname.'DiffBuf'
-	if exists(varname)
-	  return 1
-	endif
+    let varname = 't:'.diffname.'DiffBuffer'
+    if exists(varname)
+      return 1
+    endif
   endfor
   return 0
+endfunc
+
+func s:getHgCwd()
+  if exists('b:fileDir')
+    return b:fileDir
+  else
+    return expand('%:h')
+  endif
+endfunc
+
+" ------------------------------------------------------------------------------
+" Mercurial log navigation.
+
+func g:openLogWindow()
+  if exists('t:hgLogBuffer')
+    call g:closeLogWindow()
+  endif
+  " first switch to the original diff buffer, if there is one, otherwise operate
+  " on the current buffer
+  if exists("t:origDiffBuffer")
+    exe t:origDiffBuffer 'buffer'
+  endif
+  " only proceed for normal buffers
+  if &buftype == ''
+    " figure out the file name and number of the current buffer
+    let t:hgLogFileBuffer = bufnr("%")
+    let filepath = expand('%')
+    let filedir = expand('%:h')
+    " open the log navigation window
+    botright 10 new
+    let t:hgLogBuffer = bufnr('%')
+    let b:fileDir = filedir
+    " read the mercurial log into it
+    silent exe 'file' fnameescape('log '.filepath)
+    silent exe '1read !hg log --template "{rev}|{date|shortdate}|{node|short}|{author|user}|{desc}\n" '.shellescape(filepath)
+    1d
+    " justify the columns
+    silent %s@^\d\+@\=submatch(0).repeat(' ', 5-len(submatch(0)))@
+    silent %s@^\(\%([^|]*|\)\{3\}\)\([^|]*\)@\=submatch(1).submatch(2).repeat(' ', 14-len(submatch(2)))@
+    " go the first line (most recent revision)
+    1
+    " set the buffer properties
+    setlocal buftype=nofile
+    setlocal nomodifiable
+    setlocal noswapfile
+    setlocal bufhidden=delete
+    call s:setWrapMode(0)
+    " set up some useful key mappings
+    nmap <silent> <CR> :call <SID>openLogRevisionDiff(matchstr(getline('.'), '\d\+'))<CR>
+    " housekeeping for buffer close
+    augroup TuentiMercurialDiff
+      autocmd BufDelete <buffer> call s:cleanUpLog()
+    augroup END
+  endif
+endfunc
+
+func g:closeLogWindow()
+  if exists('t:hgLogBuffer')
+    " delete the buffer and let the BufDelete autocmd do the clean-up
+    exe t:hgLogBuffer 'bdelete'
+  endif
+endfunc
+
+func s:cleanUpLog()
+  unlet! t:hgLogBuffer
+  unlet! t:hgLogFileBuffer
+endfunc
+
+func s:openLogRevisionDiff(rev)
+  call s:closeDiff('logRevision')
+  if a:rev != '' && exists('t:hgLogFileBuffer')
+    " put the focus in the file window so that openHgDiff() works
+    exe bufwinnr(t:hgLogFileBuffer) 'wincmd w'
+    call s:openHgDiff('logRevision', a:rev, a:rev)
+    " return the focus to the log window
+    if exists('t:hgLogBuffer')
+      exe bufwinnr(t:hgLogBuffer) 'wincmd w'
+      setlocal nowrap
+    endif
+  endif
+endfunc
+func s:closeLogRevisionDiff()
+  call s:closeDiff('logRevision')
+endfunc
+
+func s:setWrapMode(...)
+  if a:0
+    let b:wrapMode = a:1
+  endif
+  if exists('b:wrapMode')
+    let &l:wrap = b:wrapMode
+  endif
 endfunc
 
 " ------------------------------------------------------------------------------
