@@ -466,14 +466,18 @@ func g:openLogWindow()
     let b:fileDir = filedir
     " read the mercurial log into it
     silent exe 'file' fnameescape('log '.filepath)
-    silent exe '1read !hg log --template "{rev}|{node|short}|{date|isodate}|{author|user}|{desc}\n" '.shellescape(filepath)
+    silent exe '1read !hg log --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branches}|{parents}|{desc}\n" '.shellescape(filepath)
     1d
     " justify the first column (rev number)
     silent %s@^\d\+@\=submatch(0).repeat(' ', 5-len(submatch(0)))@
     " clean up the date column
     silent %s@^\(\%([^|]*|\)\{2\}\)\([^|]*\) +\d\d\d\d|@\1\2|@
     " justify/truncate the username column
-    silent %s@^\(\%([^|]*|\)\{3\}\)\([^|]*\)@\=submatch(1).strpart(submatch(2),0,14).repeat(' ', 14-len(submatch(2)))@
+    silent %s@^\(\%([^|]*|\)\{3\}\)\([^|]*\)@\=submatch(1).strpart(submatch(2),0,10).repeat(' ', 10-len(submatch(2)))@
+    " justify/truncate the branch column
+    silent %s@^\(\%([^|]*|\)\{4\}\)\([^|]*\)@\=submatch(1).strpart(submatch(2),0,30).repeat(' ', 30-len(submatch(2)))@
+    " condense the parents column into "M" flag
+    silent %s@^\(\%([^|]*|\)\{5\}\)\([^|]*\)@\=submatch(1).call('s:mergeFlag', [submatch(2)])@
     " go the first line (most recent revision)
     1
     " set the buffer properties
@@ -485,12 +489,28 @@ func g:openLogWindow()
     " Set up some useful key mappings.
     " The crap after the <CR> is a kludge to force Vim to synchronise the
     " scrolling of the diff windows, which it does not do correctly
-    nmap <silent> <CR> :call <SID>openLogRevisionDiff(matchstr(getline('.'), '\d\+'))<CR>0kj
+    nnoremap <buffer> <silent> <CR> 10_:call <SID>openLogRevisionDiff(matchstr(getline('.'), '\d\+'))<CR>0kj
+    nnoremap <buffer> <silent> - -
+    nnoremap <buffer> <silent> + +
+    nnoremap <buffer> <silent> _ _
+    nnoremap <buffer> <silent> = 10_
     " housekeeping for buffer close
     augroup TuentiMercurialDiff
       autocmd BufDelete <buffer> call s:cleanUpLog()
     augroup END
   endif
+endfunc
+
+func s:mergeFlag(hgParents)
+  let i = stridx(a:hgParents, ':')
+  if i == -1
+    return ' '
+  endif
+  let j = strridx(a:hgParents, ':')
+  if i == j
+    return ' '
+  endif
+  return 'M'
 endfunc
 
 func g:closeLogWindow()
