@@ -486,6 +486,8 @@ func g:openLogWindow()
     setlocal noswapfile
     setlocal bufhidden=delete
     call s:setBufferWrapMode(0)
+    setlocal filetype=hglogcompact
+    set syntax=hglogcompact
     " Set up some useful key mappings.
     " The crap after the <CR> is a kludge to force Vim to synchronise the
     " scrolling of the diff windows, which it does not do correctly
