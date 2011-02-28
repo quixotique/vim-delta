@@ -149,7 +149,7 @@ func s:cleanUp()
     unlet t:turnOffDiff
     call s:restoreWrapMode()
   endif
-  if !s:testAnyDiffExists()
+  if s:countDiffs() == 0
     "echo 'exists("t:origDiffBuffer") = ' . exists('t:origDiffBuffer') . ', bufnr("%") = ' . bufnr('%')
     diffoff!
     call s:restoreWrapMode()
@@ -175,7 +175,9 @@ endfunc
 func s:openBranchOriginDiff()
   let rev = get(s:getHgRevisions('--branch .'), -1, '')
   if rev != ''
-    call s:openHgDiff('branchOrigin', rev, '')
+    try
+      call s:openHgDiff('branchOrigin', rev, '')
+    endtry
   endif
 endfunc
 func s:closeBranchOriginDiff()
@@ -185,7 +187,9 @@ endfunc
 func s:openLastMergedTrunkDiff()
   let rev = s:latestHgDefaultMergeRevision()
   if rev != ''
-    call s:openHgDiff('mergedTrunk', rev, '')
+    try
+      call s:openHgDiff('mergedTrunk', rev, '')
+    endtry
   endif
 endfunc
 func s:closeLastMergedTrunkDiff()
@@ -202,7 +206,9 @@ endfunc
 func s:openNewestReleaseDiff()
   let rev = s:newestHgReleaseName()
   if rev != ''
-    call s:openHgDiff('newestRelease', rev, rev)
+    try
+      call s:openHgDiff('newestRelease', rev, rev)
+    endtry
   endif
 endfunc
 func s:closeNewestReleaseDiff()
@@ -212,7 +218,9 @@ endfunc
 func s:openPriorReleaseDiff()
   let rev = s:priorHgReleaseName()
   if rev != ''
-    call s:openHgDiff('priorRelease', rev, rev)
+    try
+      call s:openHgDiff('priorRelease', rev, rev)
+    endtry
   endif
 endfunc
 func s:closePriorReleaseDiff()
@@ -355,8 +363,10 @@ endfunc
 func s:openHgDiff(diffname, rev, label)
   let info = s:getHgRevisionInfo(a:rev)
   if len(info)
-    let annotation = info.shortnode.' '.info.user.' '.info.shortdate
-    call s:openDiff(a:diffname, '!hg --config defaults.cat= cat -r '.a:rev.' #', info.rev, annotation, a:label)
+    let annotation = info.shortnode.' '.info.shortdate
+    try
+      call s:openDiff(a:diffname, '!hg --config defaults.cat= cat -r '.a:rev.' #', info.rev, annotation, a:label)
+    endtry
   endif
 endfunc
 
@@ -377,6 +387,9 @@ func s:openDiff(diffname, readArg, rev, annotation, label)
     diffupdate
     call s:setBufferWrapMode()
   else
+    if s:countDiffs() == 4
+      echoerr "Cannot have more than four diffs at once"
+    endif
     if exists("t:origDiffBuffer")
       exe bufwinnr(t:origDiffBuffer) 'wincmd w'
     endif
@@ -410,7 +423,17 @@ func s:openDiff(diffname, readArg, rev, annotation, label)
       setlocal noswapfile
       setlocal bufhidden=delete
       setlocal scrollbind
-      diffthis
+      try
+        diffthis
+      catch /Vim(diffthis):E96:.*/ " Diffing more than 4 buffers
+        exe 'unlet' varname
+        if s:countDiffs() == 0
+          unlet t:origDiffBuffer
+        endif
+        wincmd c
+        call s:restoreWrapMode()
+        echoerr substitute(v:exception, '^Vim(\a\+):', '', '')
+      endtry
       augroup TuentiMercurialDiff
         exe 'autocmd BufDelete <buffer> call s:cleanUpDiff('.string(a:diffname).')'
       augroup END
@@ -445,7 +468,7 @@ func s:toggleOrigBufferDiffMode()
     let diff = getwinvar(bufwinnr(t:origDiffBuffer), '&diff')
     if diff
       call s:setOrigBufferDiffMode(0)
-    elseif s:testAnyDiffExists()
+    elseif s:countDiffs() != 0
       call s:setOrigBufferDiffMode(1)
     endif
   endif
@@ -471,14 +494,19 @@ func s:cleanUpDiff(diffname)
   call s:cleanUp()
 endfunc
 
-func s:testAnyDiffExists()
+func s:countDiffs()
+  let n = 0
   for diffname in s:allDiffNames
     let varname = 't:'.diffname.'DiffBuffer'
     if exists(varname)
-      return 1
+      let n += 1
     endif
   endfor
-  return 0
+  " If any diffs are present, count the original file window too.
+  if n != 0
+    let n += 1
+  endif
+  return n
 endfunc
 
 " Return the current working directory in which hg commands relating to the
@@ -584,31 +612,41 @@ func s:testLogExists()
 endfunc
 
 func s:openLogRevisionDiffs(visual)
+  call s:closeLogRevisionDiff(1)
+  call s:closeLogRevisionDiff(2)
   if a:visual
-    let rev1 = matchstr(getline(line("'<")), '\d\+')
-    let rev2 = matchstr(getline(line("'>")), '\d\+')
-    call s:openLogRevisionDiff(1, rev1)
-    if rev1 != rev2
-      call s:openLogRevisionDiff(2, rev2)
-    endif
+    let rev1 = matchstr(getline(line("'>")), '\d\+') " earliest
+    let rev2 = matchstr(getline(line("'<")), '\d\+') " latest
+    try
+      if rev1 != rev2
+        call s:openLogRevisionDiff(1, rev1)
+        call s:openLogRevisionDiff(2, rev2)
+      else
+        call s:openLogRevisionDiff(1, rev1)
+      endif
+    endtry
   else
     let rev = matchstr(getline('.'), '\d\+')
-    call s:openLogRevisionDiff(1, rev)
+    try
+      call s:openLogRevisionDiff(1, rev)
+    endtry
   endif
 endfunc
 
 func s:openLogRevisionDiff(n, rev)
   let bufname = 'logRevision'.a:n
-  call s:closeDiff(bufname)
   if a:rev != '' && exists('t:origDiffBuffer')
     " put the focus in the file window so that openHgDiff() works
     call s:gotoOrigWindow()
-    call s:openHgDiff(bufname, a:rev, a:rev)
-    " return the focus to the log window
-    if exists('t:hgLogBuffer')
-      exe bufwinnr(t:hgLogBuffer) 'wincmd w'
-      call s:setBufferWrapMode(0)
-    endif
+    try
+      call s:openHgDiff(bufname, a:rev, a:rev)
+    finally
+      " return the focus to the log window
+      if exists('t:hgLogBuffer')
+        exe bufwinnr(t:hgLogBuffer) 'wincmd w'
+        call s:setBufferWrapMode(0)
+      endif
+    endtry
   endif
 endfunc
 
