@@ -99,31 +99,36 @@ noremap <silent> <unique> <Plug>DiffsOpenPriorRelease :call <SID>openPriorReleas
 noremap <silent> <unique> <Plug>DiffsClosePriorRelease :call <SID>closePriorReleaseDiff()<CR>
 noremap <silent> <unique> <Plug>DiffsOpenNewestRelease :call <SID>openNewestReleaseDiff()<CR>
 noremap <silent> <unique> <Plug>DiffsCloseNewestRelease :call <SID>closeNewestReleaseDiff()<CR>
-noremap <silent> <unique> <Plug>DiffsCloseLogRevision :call <SID>closeLogRevisionDiff()<CR>
+noremap <silent> <unique> <Plug>DiffsCloseLogRevision :call <SID>closeLogRevisionDiffs()<CR>
 noremap <silent> <unique> <Plug>DiffsToggleOrigBuffer :call <SID>toggleOrigBufferDiffMode()<CR>
 noremap <silent> <unique> <Plug>LogOpen :call <SID>openLog()<CR>
 noremap <silent> <unique> <Plug>LogClose :call <SID>closeLog()<CR>
 
-" Whenever any buffer (window) goes away, if there are no more diff windows
+" Whenever any buffer window goes away, if there are no more diff windows
 " remaining, then turn off diff mode in the principal buffer.
 autocmd BufHidden * call s:cleanUp()
 
 " ------------------------------------------------------------------------------
 " APPLICATION FUNCTIONS
 
-let s:allDiffNames = ['workingParent', 'branchOrigin', 'mergedTrunk', 'currentTrunk', 'priorRelease', 'newestRelease', 'logRevision']
+let s:allDiffNames = ['workingParent', 'branchOrigin', 'mergedTrunk', 'currentTrunk', 'priorRelease', 'newestRelease', 'logRevision1', 'logRevision2']
 
+" Close all diff windows and the log window.  This operation should leave no
+" windows visible that were created by any mappings or functions in this plugin.
 func s:closeAll()
   call s:closeAllDiffs()
   call s:closeLog()
 endfunc
 
+" Close all diff windows, but leave any other special windows, eg, the log
+" window, open.
 func s:closeAllDiffs()
   for diffname in s:allDiffNames
     call s:closeDiff(diffname)
   endfor
 endfunc
 
+" Close the current diff window.
 func s:closeCurrentDiff()
   let curbuf = bufnr("%")
   for diffname in s:allDiffNames
@@ -146,7 +151,6 @@ func s:cleanUp()
   endif
   if !s:testAnyDiffExists()
     "echo 'exists("t:origDiffBuffer") = ' . exists('t:origDiffBuffer') . ', bufnr("%") = ' . bufnr('%')
-    "echo 'wah'
     diffoff!
     call s:restoreWrapMode()
     if exists('t:origDiffBuffer')
@@ -352,7 +356,7 @@ func s:openHgDiff(diffname, rev, label)
   let info = s:getHgRevisionInfo(a:rev)
   if len(info)
     let annotation = info.shortnode.' '.info.user.' '.info.shortdate
-    call s:openDiff(a:diffname, '!hg --config defaults.cat= cat -r '.a:rev.' #', annotation, a:label)
+    call s:openDiff(a:diffname, '!hg --config defaults.cat= cat -r '.a:rev.' #', info.rev, annotation, a:label)
   endif
 endfunc
 
@@ -362,11 +366,12 @@ endfunc
 "
 " Param: diffname The symbolic name of the new diff buffer
 " Param: readArg The argument passed to :read to fill the new buffer
+" Param: rev Stored in the buffer's b:revision variable
 " Param: annotation Extra information appended the buffer's label
 " Param: label If set, replaces diffName as the displayed label
 "
-func s:openDiff(diffname, readArg, annotation, label)
-  "echo "openDiff(".string(a:diffname).', '.string(a:readArg).', '.string(a:annotation).', '.string(a:label).')'
+func s:openDiff(diffname, readArg, rev, annotation, label)
+  "echo "openDiff(".string(a:diffname).', '.string(a:readArg).', '.string(a:rev).', '.string(a:annotation).', '.string(a:label).')'
   let varname = "t:".a:diffname."DiffBuffer"
   if exists(varname)
     diffupdate
@@ -388,6 +393,7 @@ func s:openDiff(diffname, readArg, annotation, label)
       let filedir = expand('%:h')
       vnew
       let b:fileDir = filedir
+      let b:revision = a:rev
       " turn off wrap mode in the new diff buffer
       call s:setBufferWrapMode(0)
       exe 'let' varname "=" bufnr("%")
@@ -420,21 +426,27 @@ func s:openDiff(diffname, readArg, annotation, label)
   endif
 endfunc
 
-func s:toggleOrigBufferDiffMode()
+func s:setOrigBufferDiffMode(flag)
   if exists('t:origDiffBuffer')
-    let win = bufwinnr(t:origDiffBuffer)
-    let diff = getwinvar(win, '&diff')
-    if diff
-      exe win 'wincmd w'
+    exe bufwinnr(t:origDiffBuffer) 'wincmd w'
+    if a:flag
+      diffthis
+    else
       diffoff
       setlocal scrollbind
-      call s:setBufferWrapMode(0)
-      wincmd p
+    endif
+    call s:setBufferWrapMode(0)
+    wincmd p
+  endif
+endfunc
+
+func s:toggleOrigBufferDiffMode()
+  if exists('t:origDiffBuffer')
+    let diff = getwinvar(bufwinnr(t:origDiffBuffer), '&diff')
+    if diff
+      call s:setOrigBufferDiffMode(0)
     elseif s:testAnyDiffExists()
-      exe win 'wincmd w'
-      diffthis
-      call s:setBufferWrapMode(0)
-      wincmd p
+      call s:setOrigBufferDiffMode(1)
     endif
   endif
 endfunc
@@ -506,6 +518,8 @@ func s:openLog()
     silent exe 'file' fnameescape('log '.filepath)
     silent exe '1read !hg log --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branches}|{parents}|{desc}\n" '.shellescape(filepath)
     1d
+	" sort by date
+	sort! /^\([^|]*|\)\{2\}/
     " justify the first column (rev number)
     silent %s@^\d\+@\=submatch(0).repeat(' ', 5-len(submatch(0)))@
     " clean up the date column
@@ -529,7 +543,8 @@ func s:openLog()
     " Set up some useful key mappings.
     " The crap after the <CR> is a kludge to force Vim to synchronise the
     " scrolling of the diff windows, which it does not do correctly
-    nnoremap <buffer> <silent> <CR> 10_:call <SID>openLogRevisionDiff(matchstr(getline('.'), '\d\+'))<CR>0kj
+    nnoremap <buffer> <silent> <CR> 10_:call <SID>openLogRevisionDiffs(0)<CR>0kj
+    vnoremap <buffer> <silent> <CR> 10_:<C-U>call <SID>openLogRevisionDiffs(1)<CR>0kj
     nnoremap <buffer> <silent> - 5-
     nnoremap <buffer> <silent> + 5+
     nnoremap <buffer> <silent> _ _
@@ -565,15 +580,30 @@ endfunc
 
 " Return 1 if the log buffer exists
 func s:testLogExists()
-  return exists('t:hgLogBuffer') && bufexists(t:hgLogBuffer)
+  return exists('t:hgLogBuffer') && buflisted(t:hgLogBuffer)
 endfunc
 
-func s:openLogRevisionDiff(rev)
-  call s:closeDiff('logRevision')
+func s:openLogRevisionDiffs(visual)
+  if a:visual
+    let rev1 = matchstr(getline(line("'<")), '\d\+')
+    let rev2 = matchstr(getline(line("'>")), '\d\+')
+    call s:openLogRevisionDiff(1, rev1)
+    if rev1 != rev2
+      call s:openLogRevisionDiff(2, rev2)
+    endif
+  else
+    let rev = matchstr(getline('.'), '\d\+')
+    call s:openLogRevisionDiff(1, rev)
+  endif
+endfunc
+
+func s:openLogRevisionDiff(n, rev)
+  let bufname = 'logRevision'.a:n
+  call s:closeDiff(bufname)
   if a:rev != '' && exists('t:origDiffBuffer')
     " put the focus in the file window so that openHgDiff() works
     call s:gotoOrigWindow()
-    call s:openHgDiff('logRevision', a:rev, a:rev)
+    call s:openHgDiff(bufname, a:rev, a:rev)
     " return the focus to the log window
     if exists('t:hgLogBuffer')
       exe bufwinnr(t:hgLogBuffer) 'wincmd w'
@@ -581,8 +611,15 @@ func s:openLogRevisionDiff(rev)
     endif
   endif
 endfunc
-func s:closeLogRevisionDiff()
-  call s:closeDiff('logRevision')
+
+func s:closeLogRevisionDiff(n)
+  let bufname = 'logRevision'.a:n
+  call s:closeDiff(bufname)
+endfunc
+
+func s:closeLogRevisionDiffs()
+  call s:closeLogRevisionDiff(1)
+  call s:closeLogRevisionDiff(2)
 endfunc
 
 " Record the global wrap mode and the wrap mode of the current buffer.
