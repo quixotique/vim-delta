@@ -70,9 +70,8 @@ if !exists('no_plugin_maps') && !exists('no_tuenti_tools_maps')
   if !hasmapto('<Plug>DiffsToggleOrigBuffer')
     nmap <unique> <Leader>| <Plug>DiffsToggleOrigBuffer
   endif
-  if !hasmapto('<Plug>DiffsCloseLogRevision')
-    nmap <unique> <Leader>x <Plug>DiffsCloseLogRevision
-    nmap <unique> <Leader>X <Plug>DiffsCloseLogRevision
+  if !hasmapto('<Plug>DiffsCloseLogRevisions')
+    nmap <unique> <Leader>x <Plug>DiffsCloseLogRevisions
   endif
   if !hasmapto('<Plug>LogOpen')
     nmap <unique> <Leader>l <Plug>LogOpen
@@ -99,7 +98,7 @@ noremap <silent> <unique> <Plug>DiffsOpenPriorRelease :call <SID>openPriorReleas
 noremap <silent> <unique> <Plug>DiffsClosePriorRelease :call <SID>closePriorReleaseDiff()<CR>
 noremap <silent> <unique> <Plug>DiffsOpenNewestRelease :call <SID>openNewestReleaseDiff()<CR>
 noremap <silent> <unique> <Plug>DiffsCloseNewestRelease :call <SID>closeNewestReleaseDiff()<CR>
-noremap <silent> <unique> <Plug>DiffsCloseLogRevision :call <SID>closeLogRevisionDiffs()<CR>
+noremap <silent> <unique> <Plug>DiffsCloseLogRevisions :call <SID>closeLogRevisionDiffs()<CR>
 noremap <silent> <unique> <Plug>DiffsToggleOrigBuffer :call <SID>toggleOrigBufferDiffMode()<CR>
 noremap <silent> <unique> <Plug>LogOpen :call <SID>openLog()<CR>
 noremap <silent> <unique> <Plug>LogClose :call <SID>closeLog()<CR>
@@ -153,6 +152,7 @@ func s:cleanUp()
     "echo 'exists("t:origDiffBuffer") = ' . exists('t:origDiffBuffer') . ', bufnr("%") = ' . bufnr('%')
     diffoff!
     call s:restoreWrapMode()
+    set noequalalways
     if exists('t:origDiffBuffer')
       let t:turnOffDiff = t:origDiffBuffer
       if !s:testLogExists()
@@ -404,6 +404,8 @@ func s:openDiff(diffname, readArg, rev, annotation, label)
       call s:setBufferWrapMode(0)
       let ft = &filetype
       let filedir = expand('%:h')
+      set equalalways
+      set eadirection=hor
       vnew
       let b:fileDir = filedir
       let b:revision = a:rev
@@ -546,8 +548,8 @@ func s:openLog()
     silent exe 'file' fnameescape('log '.filepath)
     silent exe '1read !hg log --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branches}|{parents}|{desc}\n" '.shellescape(filepath)
     1d
-	" sort by date
-	sort! /^\([^|]*|\)\{2\}/
+    " sort by date
+    sort! /^\([^|]*|\)\{2\}/
     " justify the first column (rev number)
     silent %s@^\d\+@\=submatch(0).repeat(' ', 5-len(submatch(0)))@
     " clean up the date column
@@ -568,6 +570,7 @@ func s:openLog()
     setlocal bufhidden=delete
     setlocal filetype=hglogcompact
     set syntax=hglogcompact
+    setlocal winfixheight
     " Set up some useful key mappings.
     " The crap after the <CR> is a kludge to force Vim to synchronise the
     " scrolling of the diff windows, which it does not do correctly
