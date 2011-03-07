@@ -544,12 +544,11 @@ func s:openLog()
     botright 10 new
     let t:hgLogBuffer = bufnr('%')
     let b:fileDir = filedir
-    " read the mercurial log into it
+	" read the mercurial log into it -- all ancestors of the current parent,
+	" sorted in reverse order of date (most recent first)
     silent exe 'file' fnameescape('log '.filepath)
-    silent exe '1read !hg log --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branches}|{parents}|{desc}\n" '.shellescape(filepath)
+    silent exe '1read !hg log --rev "sort(ancestors(.), -date)" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branches}|{parents}|{desc}\n" '.shellescape(filepath)
     1d
-    " sort by date
-    sort! /^\([^|]*|\)\{2\}/
     " justify the first column (rev number)
     silent %s@^\d\+@\=submatch(0).repeat(' ', 5-len(submatch(0)))@
     " clean up the date column
@@ -589,6 +588,8 @@ func s:openLog()
   endif
 endfunc
 
+" Convert a list of parent revisions into a single character: "M" if there are
+" two (or more) parents, " " otherwise.
 func s:mergeFlag(hgParents)
   let i = stridx(a:hgParents, ':')
   if i == -1
@@ -691,15 +692,23 @@ func s:restoreWrapMode()
   endif
 endfunc
 
+" Use this function instead of :setglobal [no]wrap.  There are three use cases:
+" 	:call s:setGlobalWrapMode(0) equivalent to :setglobal nowrap
+" 	:call s:setGlobalWrapMode(1) equivalent to :setglobal wrap
+" 	:call s:setGlobalWrapMode() equivalent to most recent of the above
 func s:setGlobalWrapMode(...)
   if a:0
-    let g:wrapMode = a:1
+    let t:wrapMode = a:1
   endif
   if exists('g:wrapMode')
-    let &g:wrap = g:wrapMode
+    let &g:wrap = t:wrapMode
   endif
 endfunc
 
+" Use this function instead of :setlocal [no]wrap.  There are three use cases:
+" 	:call s:setBufferWrapMode(0) equivalent to :setlocal nowrap
+" 	:call s:setBufferWrapMode(1) equivalent to :setlocal wrap
+" 	:call s:setBufferWrapMode() equivalent to most recent of the above
 func s:setBufferWrapMode(...)
   if a:0
     let b:wrapMode = a:1
