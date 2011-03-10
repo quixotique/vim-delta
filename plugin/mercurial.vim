@@ -81,6 +81,11 @@ if !exists('no_plugin_maps') && !exists('no_tuenti_tools_maps')
   endif
 endif
 
+" Default commands, will not replace existing commands with same name.
+if !exists(':HgDiff')
+  command -nargs=1 HgDiff call <SID>openRevisionDiff(<q-args>)
+endif
+
 " Global maps, available for your own key bindings.
 "
 noremap <silent> <unique> <Plug>CloseAll :call <SID>closeAll()<CR>
@@ -110,7 +115,7 @@ autocmd BufHidden * call s:cleanUp()
 " ------------------------------------------------------------------------------
 " APPLICATION FUNCTIONS
 
-let s:allDiffNames = ['workingParent', 'branchOrigin', 'mergedTrunk', 'currentTrunk', 'priorRelease', 'newestRelease', 'logRevision1', 'logRevision2']
+let s:allDiffNames = ['workingParent', 'branchOrigin', 'mergedTrunk', 'currentTrunk', 'priorRelease', 'newestRelease', 'revision1', 'revision2']
 
 " Close all diff windows and the log window.  This operation should leave no
 " windows visible that were created by any mappings or functions in this plugin.
@@ -165,9 +170,24 @@ func s:cleanUp()
   endif
 endfunc
 
-func s:openWorkingParentDiff()
-  call s:openHgDiff('workingParent', '.', '')
+func s:openRevisionDiff(rev)
+  if a:rev != ''
+    try
+      call s:openHgDiff('revision1', a:rev, a:rev)
+    endtry
+  endif
 endfunc
+
+func s:closeRevisionDiff(rev)
+  call s:closeDiff('revision1')
+endfunc
+
+func s:openWorkingParentDiff()
+  try
+    call s:openHgDiff('workingParent', '.', '')
+  endtry
+endfunc
+
 func s:closeWorkingParentDiff()
   call s:closeDiff('workingParent')
 endfunc
@@ -180,6 +200,7 @@ func s:openBranchOriginDiff()
     endtry
   endif
 endfunc
+
 func s:closeBranchOriginDiff()
   call s:closeDiff('branchOrigin')
 endfunc
@@ -192,6 +213,7 @@ func s:openLastMergedTrunkDiff()
     endtry
   endif
 endfunc
+
 func s:closeLastMergedTrunkDiff()
   call s:closeDiff('mergedTrunk')
 endfunc
@@ -199,6 +221,7 @@ endfunc
 func s:openTrunkDiff()
   call s:openHgDiff('currentTrunk', 'default', '')
 endfunc
+
 func s:closeTrunkDiff()
   call s:closeDiff('currentTrunk')
 endfunc
@@ -211,6 +234,7 @@ func s:openNewestReleaseDiff()
     endtry
   endif
 endfunc
+
 func s:closeNewestReleaseDiff()
   call s:closeDiff('newestRelease')
 endfunc
@@ -223,6 +247,7 @@ func s:openPriorReleaseDiff()
     endtry
   endif
 endfunc
+
 func s:closePriorReleaseDiff()
   call s:closeDiff('priorRelease')
 endfunc
@@ -390,9 +415,8 @@ func s:openDiff(diffname, readArg, rev, annotation, label)
     if s:countDiffs() == 4
       echoerr "Cannot have more than four diffs at once"
     endif
-    if exists("t:origDiffBuffer")
-      exe bufwinnr(t:origDiffBuffer) 'wincmd w'
-    endif
+    " put focus in the window containing the original file
+    call s:gotoOrigWindow()
     " only proceed for normal buffers
     if &buftype == ''
       let t:origDiffBuffer = bufnr("%")
@@ -451,9 +475,18 @@ func s:openDiff(diffname, readArg, rev, annotation, label)
   endif
 endfunc
 
-func s:setOrigBufferDiffMode(flag)
+" Put the focus in the original diff file window and return 1 if it exists.
+" Otherwise return 0.
+func s:gotoOrigWindow()
   if exists('t:origDiffBuffer')
     exe bufwinnr(t:origDiffBuffer) 'wincmd w'
+    return 1
+  endif
+  return 0
+endfunc
+
+func s:setOrigBufferDiffMode(flag)
+  if s:gotoOrigWindow()
     if a:flag
       diffthis
     else
@@ -473,12 +506,6 @@ func s:toggleOrigBufferDiffMode()
     elseif s:countDiffs() != 0
       call s:setOrigBufferDiffMode(1)
     endif
-  endif
-endfunc
-
-func s:gotoOrigWindow()
-  if exists('t:origDiffBuffer')
-    exe bufwinnr(t:origDiffBuffer) 'wincmd w'
   endif
 endfunc
 
@@ -602,17 +629,27 @@ func s:mergeFlag(hgParents)
   return 'M'
 endfunc
 
+" Return 1 if the log buffer exists.
+func s:testLogExists()
+  return exists('t:hgLogBuffer') && buflisted(t:hgLogBuffer)
+endfunc
+
+" Put the focus in the log buffer window and return 1 if it exists.  Otherwise
+" return 0.
+func s:gotoLogWindow()
+  if exists('t:hgLogBuffer')
+    exe bufwinnr(t:hgLogBuffer) 'wincmd w'
+    return 1
+  endif
+  return 0
+endfunc
+
 func s:closeLog()
   if s:testLogExists()
     " delete the buffer and let the BufDelete autocmd do the clean-up
     exe t:hgLogBuffer 'bdelete'
   endif
   unlet! t:hgLogBuffer
-endfunc
-
-" Return 1 if the log buffer exists
-func s:testLogExists()
-  return exists('t:hgLogBuffer') && buflisted(t:hgLogBuffer)
 endfunc
 
 func s:openLogRevisionDiffs(visual)
@@ -638,16 +675,13 @@ func s:openLogRevisionDiffs(visual)
 endfunc
 
 func s:openLogRevisionDiff(n, rev)
-  let bufname = 'logRevision'.a:n
+  let bufname = 'revision'.a:n
   if a:rev != '' && exists('t:origDiffBuffer')
-    " put the focus in the file window so that openHgDiff() works
-    call s:gotoOrigWindow()
     try
       call s:openHgDiff(bufname, a:rev, a:rev)
     finally
       " return the focus to the log window
-      if exists('t:hgLogBuffer')
-        exe bufwinnr(t:hgLogBuffer) 'wincmd w'
+      if s:gotoLogWindow()
         call s:setBufferWrapMode(0)
       endif
     endtry
@@ -655,7 +689,7 @@ func s:openLogRevisionDiff(n, rev)
 endfunc
 
 func s:closeLogRevisionDiff(n)
-  let bufname = 'logRevision'.a:n
+  let bufname = 'revision'.a:n
   call s:closeDiff(bufname)
 endfunc
 
