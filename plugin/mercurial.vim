@@ -574,10 +574,10 @@ func s:openLog()
 	" read the mercurial log into it -- all ancestors of the current parent,
 	" sorted in reverse order of date (most recent first)
     silent exe 'file' fnameescape('log '.filepath)
-    silent exe '1read !hg log --rev "sort(ancestors(.), -date)" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branches}|{parents}|{desc}\n" '.shellescape(filepath)
+    silent exe '1read !hg log --rev "sort(ancestors(parents(.)), -date)" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branches}|{parents}|{desc|firstline}\n" '.shellescape(filepath)
     1d
     " justify the first column (rev number)
-    silent %s@^\d\+@\=submatch(0).repeat(' ', 5-len(submatch(0)))@
+    silent %s@^\d\+@\=submatch(0).repeat(' ', 6-len(submatch(0)))@
     " clean up the date column
     silent %s@^\(\%([^|]*|\)\{2\}\)\([^|]*\) +\d\d\d\d|@\1\2|@
     " justify/truncate the username column
