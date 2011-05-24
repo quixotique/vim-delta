@@ -427,6 +427,7 @@ func s:openDiff(diffname, readArg, rev, annotation, label)
       " turn off wrap mode in the original file buffer
       call s:setBufferWrapMode(0)
       let ft = &filetype
+      let filename = expand("%")
       let filedir = expand('%:h')
       set equalalways
       set eadirection=hor
@@ -436,10 +437,11 @@ func s:openDiff(diffname, readArg, rev, annotation, label)
       " turn off wrap mode in the new diff buffer
       call s:setBufferWrapMode(0)
       exe 'let' varname "=" bufnr("%")
-      let displayName = (a:label != '') ? a:label : a:diffname
+      let displayName = filename
       if a:annotation != ''
         let displayName .= ' '.a:annotation
       endif
+      let displayName .= ' ' . ((a:label != '') ? a:label : a:diffname)
       silent exe 'file' fnameescape(displayName)
       silent exe '1read' a:readArg
       1d
