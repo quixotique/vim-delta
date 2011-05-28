@@ -279,7 +279,7 @@ endfunc
 " file's repository, in lexical sorted order.
 func s:allHgReleaseNames()
   let dir = s:getHgCwd()
-  let lines = split(system('cd '.shellescape(dir).'&& hg --config defaults.branches= branches | awk ''$1~/^release-/{print $1}'''), "\n")
+  let lines = split(system('cd '.shellescape(dir).' >/dev/null && hg --config defaults.branches= branches | awk ''$1~/^release-/{print $1}'''), "\n")
   if s:displayHgError('Could not get list of branches', lines)
     return []
   endif
@@ -311,7 +311,7 @@ endfunc
 " hg log options, in reverse chronological order (most recent first).
 func s:getHgRevisions(hgLogOpts)
   let dir = s:getHgCwd()
-  let lines = split(system('cd '.shellescape(dir).' && hg --config defaults.log= log --template "{node}\n" '.a:hgLogOpts), "\n")
+  let lines = split(system('cd '.shellescape(dir).' >/dev/null  && hg --config defaults.log= log --template "{node}\n" '.a:hgLogOpts), "\n")
   if s:displayHgError('Could not get revisions from "hg log '.a:hgLogOpts.'"', lines)
     return []
   endif
@@ -322,7 +322,7 @@ endfunc
 func s:getHgRevisionInfo(rev)
   let info = {}
   let dir = s:getHgCwd()
-  let lines = split(system('cd '.shellescape(dir).' && hg --config defaults.log= log --template "{rev}\n{node}\n{node|short}\n{branches}\n{parents}\n{tags}\n{author}\n{author|user}\n{date|date}\n{date|isodate}\n{date|shortdate}\nDESCRIPTION\n{desc}\n" --rev '.a:rev), "\n")
+  let lines = split(system('cd '.shellescape(dir).' >/dev/null && hg --config defaults.log= log --template "{rev}\n{node}\n{node|short}\n{branches}\n{parents}\n{tags}\n{author}\n{author|user}\n{date|date}\n{date|isodate}\n{date|shortdate}\nDESCRIPTION\n{desc}\n" --rev '.a:rev), "\n")
   if !s:displayHgError('Could not get information for revision "'.a:rev.'"', lines)
     if len(lines) < 13 || lines[11] != 'DESCRIPTION'
       echoerr 'Malformed output from "hg log":'
