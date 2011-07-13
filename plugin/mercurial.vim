@@ -227,7 +227,7 @@ func s:closeTrunkDiff()
 endfunc
 
 func s:openNewestReleaseDiff()
-  let rev = s:newestHgReleaseName()
+  let rev = s:newestHgReleaseRev()
   if rev != ''
     try
       call s:openHgDiff('newestRelease', rev, rev)
@@ -240,7 +240,7 @@ func s:closeNewestReleaseDiff()
 endfunc
 
 func s:openPriorReleaseDiff()
-  let rev = s:priorHgReleaseName()
+  let rev = s:priorHgReleaseRev()
   if rev != ''
     try
       call s:openHgDiff('priorRelease', rev, rev)
@@ -275,12 +275,12 @@ func s:displayHgError(message, lines)
   return 0
 endfunc
 
-" Return a list of the names of all Mercurial release branches in the current
+" Return a list of the names of all Mercurial release tags in the current
 " file's repository, in lexical sorted order.
-func s:allHgReleaseNames()
+func s:allHgReleaseTags()
   let dir = s:getHgCwd()
-  let lines = split(system('cd '.shellescape(dir).' >/dev/null && hg --config defaults.branches= branches | awk ''$1~/^release-/{print $1}'''), "\n")
-  if s:displayHgError('Could not get list of branches', lines)
+  let lines = split(system('cd '.shellescape(dir).' >/dev/null && hg --config defaults.tags= tags | awk ''$1~/^release_[0-9]+_finished$/{print $1}'''), "\n")
+  if s:displayHgError('Could not get list of tags', lines)
     return []
   endif
   return sort(lines)
@@ -297,14 +297,14 @@ endfunc
 
 " Return the latest Mercurial release name, or '' if there are no release
 " branches.
-func s:newestHgReleaseName()
-  return get(s:allHgReleaseNames(), -1, '')
+func s:newestHgReleaseRev()
+  return get(s:allHgReleaseTags(), -1, '')
 endfunc
 
 " Return the penultimate Mercurial release name, or '' if there are fewer than
 " two release branches.
-func s:priorHgReleaseName()
-  return get(s:allHgReleaseNames(), -2, '')
+func s:priorHgReleaseRev()
+  return get(s:allHgReleaseTags(), -2, '')
 endfunc
 
 " Return a list of Mercurial revision IDs (nodes) determined by the given
