@@ -31,11 +31,23 @@ if !exists('no_plugin_maps') && !exists('no_tuenti_tools_maps')
   if !hasmapto('<Plug>DiffsCloseWindow')
     nmap <unique> <Leader>- <Plug>DiffsCloseWindow
   endif
-  if !hasmapto('<Plug>DiffsOpenWorkingParent')
-    nmap <unique> <Leader>w <Plug>DiffsOpenWorkingParent
+  if !hasmapto('<Plug>DiffsToggleWorkingParent1')
+    nmap <unique> <Leader>1 <Plug>DiffsToggleWorkingParent1
   endif
-  if !hasmapto('<Plug>DiffsCloseWorkingParent')
-    nmap <unique> <Leader>W <Plug>DiffsCloseWorkingParent
+  if !hasmapto('<Plug>DiffsOpenWorkingParent1')
+    nmap <unique> <Leader>w <Plug>DiffsOpenWorkingParent1
+  endif
+  if !hasmapto('<Plug>DiffsCloseWorkingParent1')
+    nmap <unique> <Leader>W <Plug>DiffsCloseWorkingParent1
+  endif
+  if !hasmapto('<Plug>DiffsToggleWorkingParent2')
+    nmap <unique> <Leader>2 <Plug>DiffsToggleWorkingParent2
+  endif
+  if !hasmapto('<Plug>DiffsOpenWorkingParent2')
+    nmap <unique> <Leader>q <Plug>DiffsOpenWorkingParent2
+  endif
+  if !hasmapto('<Plug>DiffsCloseWorkingParent2')
+    nmap <unique> <Leader>Q <Plug>DiffsCloseWorkingParent2
   endif
   if !hasmapto('<Plug>DiffsOpenCurrentTrunk')
     nmap <unique> <Leader>t <Plug>DiffsOpenCurrentTrunk
@@ -91,8 +103,12 @@ endif
 noremap <silent> <unique> <Plug>CloseAll :call <SID>closeAll()<CR>
 noremap <silent> <unique> <Plug>DiffsCloseAll :call <SID>closeAllDiffs()<CR>
 noremap <silent> <unique> <Plug>DiffsCloseWindow :call <SID>closeCurrentDiff()<CR>
-noremap <silent> <unique> <Plug>DiffsOpenWorkingParent :call <SID>openWorkingParentDiff()<CR>
-noremap <silent> <unique> <Plug>DiffsCloseWorkingParent :call <SID>closeWorkingParentDiff()<CR>
+noremap <silent> <unique> <Plug>DiffsToggleWorkingParent1 :call <SID>toggleWorkingParent1Diff()<CR>
+noremap <silent> <unique> <Plug>DiffsOpenWorkingParent1 :call <SID>openWorkingParent1Diff()<CR>
+noremap <silent> <unique> <Plug>DiffsCloseWorkingParent1 :call <SID>closeWorkingParent1Diff()<CR>
+noremap <silent> <unique> <Plug>DiffsToggleWorkingParent2 :call <SID>toggleWorkingParent2Diff()<CR>
+noremap <silent> <unique> <Plug>DiffsOpenWorkingParent2 :call <SID>openWorkingParent2Diff()<CR>
+noremap <silent> <unique> <Plug>DiffsCloseWorkingParent2 :call <SID>closeWorkingParent2Diff()<CR>
 noremap <silent> <unique> <Plug>DiffsOpenCurrentTrunk :call <SID>openTrunkDiff()<CR>
 noremap <silent> <unique> <Plug>DiffsCloseCurrentTrunk :call <SID>closeTrunkDiff()<CR>
 noremap <silent> <unique> <Plug>DiffsOpenLastMergedTrunk :call <SID>openLastMergedTrunkDiff()<CR>
@@ -115,7 +131,7 @@ autocmd BufHidden * call s:cleanUp()
 " ------------------------------------------------------------------------------
 " APPLICATION FUNCTIONS
 
-let s:allDiffNames = ['workingParent', 'branchOrigin', 'mergedTrunk', 'currentTrunk', 'priorRelease', 'newestRelease', 'revision1', 'revision2']
+let s:allDiffNames = ['parent1', 'parent2', 'branchOrigin', 'mergedTrunk', 'currentTrunk', 'priorRelease', 'newestRelease', 'revision1', 'revision2']
 
 " Close all diff windows and the log window.  This operation should leave no
 " windows visible that were created by any mappings or functions in this plugin.
@@ -182,14 +198,48 @@ func s:closeRevisionDiff(rev)
   call s:closeDiff('revision1')
 endfunc
 
-func s:openWorkingParentDiff()
+func s:toggleWorkingParent1Diff()
+  if s:isDiffOpen('parent1')
+    try
+      call s:closeWorkingParent1Diff()
+    endtry
+  else
+    try
+      call s:openWorkingParent1Diff()
+    endtry
+  endif
+endfunc
+
+func s:openWorkingParent1Diff()
   try
-    call s:openHgDiff('workingParent', '.', '')
+    call s:openHgDiff('parent1', '.', '')
   endtry
 endfunc
 
-func s:closeWorkingParentDiff()
-  call s:closeDiff('workingParent')
+func s:closeWorkingParent1Diff()
+  call s:closeDiff('parent1')
+endfunc
+
+func s:toggleWorkingParent2Diff()
+  if s:isDiffOpen('parent2')
+    try
+      call s:closeWorkingParent2Diff()
+    endtry
+  else
+    try
+      call s:openWorkingParent2Diff()
+    endtry
+  endif
+endfunc
+
+func s:openWorkingParent2Diff()
+  try
+    call s:openHgDiff('parent2', 'p2()', '')
+  endtry
+endfunc
+
+func s:closeWorkingParent2Diff()
+  call s:closeDiff('parent2')
 endfunc
 
 func s:openBranchOriginDiff()
@@ -322,10 +372,16 @@ endfunc
 func s:getHgRevisionInfo(rev)
   let info = {}
   let dir = s:getHgCwd()
-  let lines = split(system('cd '.shellescape(dir).' >/dev/null && hg --config defaults.log= log --template "{rev}\n{node}\n{node|short}\n{branches}\n{parents}\n{tags}\n{author}\n{author|user}\n{date|date}\n{date|isodate}\n{date|shortdate}\nDESCRIPTION\n{desc}\n" --rev '.a:rev), "\n")
+  let lines = split(system('cd '.shellescape(dir).' >/dev/null && hg --config defaults.log= log --template "{rev}\n{node}\n{node|short}\n{branches}\n{parents}\n{tags}\n{author}\n{author|user}\n{date|date}\n{date|isodate}\n{date|shortdate}\nDESCRIPTION\n{desc}\n" --rev '.shellescape(a:rev)), "\n")
   if !s:displayHgError('Could not get information for revision "'.a:rev.'"', lines)
-    if len(lines) < 13 || lines[11] != 'DESCRIPTION'
-      echoerr 'Malformed output from "hg log":'
+    if len(lines) == 0
+      echohl ErrorMsg
+      echomsg 'Revision "'.a:rev.'" does not exist'
+      echohl None
+    elseif len(lines) < 13 || lines[11] != 'DESCRIPTION'
+      echohl ErrorMsg
+      echomsg 'Malformed output from "hg log":'
+      echohl None
       for line in lines
         echomsg line
       endfor
@@ -390,7 +446,7 @@ func s:openHgDiff(diffname, rev, label)
   if len(info)
     let annotation = info.shortnode.' '.info.shortdate
     try
-      call s:openDiff(a:diffname, '!hg --config defaults.cat= cat -r '.a:rev.' #', info.rev, annotation, a:label)
+      call s:openDiff(a:diffname, '!hg --config defaults.cat= cat -r '.info.rev.' #', info.rev, annotation, a:label)
     endtry
   endif
 endfunc
@@ -517,6 +573,11 @@ func s:closeDiff(diffname)
     " delete the buffer and let the BufDelete autocmd do the clean-up
     exe 'exe' varname '"bdelete"'
   endif
+endfunc
+
+func s:isDiffOpen(diffname)
+  let varname = 't:'.a:diffname.'DiffBuffer'
+  return exists(varname)
 endfunc
 
 func s:cleanUpDiff(diffname)
