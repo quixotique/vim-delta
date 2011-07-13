@@ -634,11 +634,20 @@ func s:openLog()
     botright 10 new
     let t:hgLogBuffer = bufnr('%')
     let b:fileDir = filedir
-	" read the mercurial log into it -- all ancestors of the current parent,
-	" sorted in reverse order of date (most recent first)
+    " give the buffer a helpful name
     silent exe 'file' fnameescape('log '.filepath)
-    silent exe '1read !hg log --rev "sort(ancestors(parents(.)), -date)" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branches}|{parents}|{desc|firstline}\n" '.shellescape(filepath)
+    " read the mercurial log into it -- all ancestors of the current working revision
+    if s:isWorkingMerge()
+      " if currently merging, show '1' and '2' flags to indicate which revisions contributed to each parent
+      silent exe '$read !hg --config defaults.log= log --rev "ancestors(p1())-ancestors(ancestor(p1(),p2()))" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}|1 +{parents}|{desc|firstline}\n" '.shellescape(filepath)
+      silent exe '$read !hg --config defaults.log= log --rev "ancestors(p2())-ancestors(ancestor(p1(),p2()))" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}| 2+{parents}|{desc|firstline}\n" '.shellescape(filepath)
+      silent exe '$read !hg --config defaults.log= log --rev "ancestors(ancestor(p1(),p2()))" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}|12+{parents}|{desc|firstline}\n" '.shellescape(filepath)
+    else
+      silent exe '$read !hg --config defaults.log= log --rev "ancestors(parents())" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}|{parents}|{desc|firstline}\n" '.shellescape(filepath)
+    endif
     1d
+    " sort by reverse date (most recent first)
+    sort! /^\([^|]*|\)\{2\}/
     " justify the first column (rev number)
     silent %s@^\d\+@\=submatch(0).repeat(' ', 6-len(submatch(0)))@
     " clean up the date column
@@ -648,7 +657,7 @@ func s:openLog()
     " justify/truncate the branch column
     silent %s@^\(\%([^|]*|\)\{4\}\)\([^|]*\)@\=submatch(1).strpart(submatch(2),0,30).repeat(' ', 30-len(submatch(2)))@
     " condense the parents column into "M" flag
-    silent %s@^\(\%([^|]*|\)\{5\}\)\([^|]*\)@\=submatch(1).call('s:mergeFlag', [submatch(2)])@
+    silent %s@^\(\%([^|]*|\)\{5\}\)\%(\([^+]*\)+\)\?\([^|]*\)@\=submatch(1).submatch(2).call('s:mergeFlag', [submatch(3)])@
     " go the first line (most recent revision)
     1
     " set the buffer properties
@@ -676,6 +685,22 @@ func s:openLog()
       autocmd BufDelete <buffer> call s:cleanUp()
     augroup END
   endif
+endfunc
+
+" Return 1 if the current working directory is a merge (has two parents).
+func s:isWorkingMerge()
+  let dir = s:getHgCwd()
+  let nparents = system('cd '.shellescape(dir).' >/dev/null && hg --config defaults.parents= parents --template "x\n" | wc -l')
+  if v:shell_error
+    echohl ErrorMsg
+    echomsg 'Could not count Mercurial parents of working directory'
+    echohl None
+    return 0
+  endif
+  if str2nr(nparents) == '2'
+    return 1
+  endif
+  return 0
 endfunc
 
 " Convert a list of parent revisions into a single character: "M" if there are
