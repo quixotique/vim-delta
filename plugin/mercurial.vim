@@ -746,14 +746,13 @@ func s:openLogRevisionDiffs(visual)
   if a:visual
     let rev1 = matchstr(getline(line("'>")), '\d\+') " earliest
     let rev2 = matchstr(getline(line("'<")), '\d\+') " latest
-    try
-      if rev1 != rev2
-        call s:openLogRevisionDiff(1, rev1)
+    let info = s:getHgRevisionInfo('p1(rev('.rev1.'))')
+    if len(info)
+      try
+        call s:openLogRevisionDiff(1, info.rev)
         call s:openLogRevisionDiff(2, rev2)
-      else
-        call s:openLogRevisionDiff(1, rev1)
-      endif
-    endtry
+      endtry
+    endif
   else
     let rev = matchstr(getline('.'), '\d\+')
     try
