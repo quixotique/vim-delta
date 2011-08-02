@@ -674,7 +674,7 @@ func s:openLog()
       silent exe '$read !hg --config defaults.log= log --rev "ancestors(p2())-ancestors(ancestor(p1(),p2()))" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}| 2+{parents}|{desc|firstline}\n" '.shellescape(filepath)
       silent exe '$read !hg --config defaults.log= log --rev "ancestors(ancestor(p1(),p2()))" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}|12+{parents}|{desc|firstline}\n" '.shellescape(filepath)
     else
-      silent exe '$read !hg --config defaults.log= log --rev "ancestors(parents())" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}|{parents}|{desc|firstline}\n" '.shellescape(filepath)
+      silent exe '$read !hg --config defaults.log= log --rev "ancestors(parents())" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}|+{parents}|{desc|firstline}\n" '.shellescape(filepath)
     endif
     1d
     " sort by reverse date (most recent first)
@@ -688,7 +688,7 @@ func s:openLog()
     " justify/truncate the branch column
     silent %s@^\(\%([^|]*|\)\{4\}\)\([^|]*\)@\=submatch(1).strpart(submatch(2),0,30).repeat(' ', 30-len(submatch(2)))@
     " condense the parents column into "M" flag
-    silent %s@^\(\%([^|]*|\)\{5\}\)\%(\([^+]*\)+\)\?\([^|]*\)@\=submatch(1).submatch(2).call('s:mergeFlag', [submatch(3)])@
+    silent %s@^\(\%([^|]*|\)\{5\}\)\([^+]*+\)\([^|]*\)@\=submatch(1).submatch(2)[:-2].call('s:mergeFlag', [submatch(3)])@
     " go the first line (most recent revision)
     1
     " set the buffer properties
@@ -721,14 +721,14 @@ endfunc
 " Return 1 if the current working directory is a merge (has two parents).
 func s:isWorkingMerge()
   let dir = s:getHgCwd()
-  let nparents = system('cd '.shellescape(dir).' >/dev/null && hg --config defaults.parents= parents --template "x\n" | wc -l')
+  let nparents = system('cd '.shellescape(dir).' >/dev/null && hg --config defaults.parents= parents --template "x\n" | wc --lines')
   if v:shell_error
     echohl ErrorMsg
     echomsg 'Could not count Mercurial parents of working directory'
     echohl None
     return 0
   endif
-  if str2nr(nparents) == '2'
+  if str2nr(nparents) == 2
     return 1
   endif
   return 0
