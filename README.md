@@ -38,7 +38,7 @@ called `delta.vim`.  You can use a different name and location.
         cd delta.vim
         mkdir plugin
         cd plugin
-        wget https://raw.githubusercontent.com/quixotique/delta.vim/master/plugin/mercurial.vim
+        wget https://raw.githubusercontent.com/quixotique/delta.vim/master/plugin/delta.vim
         cd ..
         mkdir syntax
         cd syntax
