@@ -2,9 +2,9 @@
 " vim: et ts=8 sts=2 sw=2
 "
 " Copyright 2011 Tuenti Technologies S.L.
-" License: This file can only be stored on servers belonging to Tuenti Technologies S.L.
-" Author: Andrew Bettison <abettison@tuenti.com>
-" Maintainer: Andrew Bettison <abettison@tuenti.com>
+" License: GPL 3.0
+" Author: Andrew Bettison <andrew@iverin.com.au>
+" Maintainer: Andrew Bettison <andrew@iverin.com.au>
 
 " ------------------------------------------------------------------------------
 " Exit if this app has already been loaded or in vi compatible mode.

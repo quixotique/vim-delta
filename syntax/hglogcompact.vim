@@ -1,6 +1,8 @@
 " Vim syntax file
-" Language:	Tuenti Mercurial Plugin compact log window
-" Maintainer:	Andrew Bettison <abettison@tuenti.com>
+" Copyright 2011 Tuenti Technologies S.L.
+" Language:	DiffIt Mercurial Plugin compact log window
+" Maintainer:	Andrew Bettison <andrew@iverin.com.au>
+" License:	GPL 3.0
 " Last change:	2011 02 25
 
 " Quit when a syntax file was already loaded
