@@ -1,6 +1,6 @@
 " Vim syntax file
 " Copyright 2011 Tuenti Technologies S.L.
-" Language:	DiffIt Mercurial Plugin compact log window
+" Language:	Delta.Vim Mercurial Plugin compact log window
 " Maintainer:	Andrew Bettison <andrew@iverin.com.au>
 " License:	GPL 3.0
 " Last change:	2011 02 25

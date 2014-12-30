@@ -35,10 +35,10 @@
 "" \0	Close all	 Equivalent to \\ followed by \L
 "" \|	Toggle main	 Toggle the diff mode of the main file window. This is useful when two diff windows are open, to see only the changes between them.
 
-if exists("g:loaded_TuentiMercurialDiff") || &cp
+if exists("g:loaded_DeltaVim_Hg") || &cp
   finish
 endif
-let g:loaded_TuentiMercurialDiff = 1
+let g:loaded_DeltaVim_Hg = 1
 
 " Standard Vim plugin boilerplate.
 let s:keepcpo = &cpo
@@ -48,78 +48,78 @@ set cpo&vim
 " PUBLIC INTERFACE
 
 " Default key bindings, only set where no binding already has been defined.
-if !exists('no_plugin_maps') && !exists('no_tuenti_tools_maps')
-  if !hasmapto('<Plug>CloseAll')
-    nmap <unique> <Leader>0 <Plug>CloseAll
+if !exists('no_plugin_maps') && !exists('no_deltavim_plugin_maps')
+  if !hasmapto('<Plug>DeltaVimCloseAll')
+    nmap <unique> <Leader>0 <Plug>DeltaVimCloseAll
   endif
-  if !hasmapto('<Plug>DiffsCloseAll')
-    nmap <unique> <Leader>\ <Plug>DiffsCloseAll
+  if !hasmapto('<Plug>DeltaVimCloseAllDiffs')
+    nmap <unique> <Leader>\ <Plug>DeltaVimCloseAllDiffs
   endif
-  if !hasmapto('<Plug>DiffsCloseWindow')
-    nmap <unique> <Leader>- <Plug>DiffsCloseWindow
+  if !hasmapto('<Plug>DeltaVimCloseWindow')
+    nmap <unique> <Leader>- <Plug>DeltaVimCloseWindow
   endif
-  if !hasmapto('<Plug>DiffsToggleWorkingParent1')
-    nmap <unique> <Leader>1 <Plug>DiffsToggleWorkingParent1
+  if !hasmapto('<Plug>DeltaVimToggleWorkingParent1')
+    nmap <unique> <Leader>1 <Plug>DeltaVimToggleWorkingParent1
   endif
-  if !hasmapto('<Plug>DiffsOpenWorkingParent1')
-    nmap <unique> <Leader>w <Plug>DiffsOpenWorkingParent1
+  if !hasmapto('<Plug>DeltaVimOpenWorkingParent1')
+    nmap <unique> <Leader>w <Plug>DeltaVimOpenWorkingParent1
   endif
-  if !hasmapto('<Plug>DiffsCloseWorkingParent1')
-    nmap <unique> <Leader>W <Plug>DiffsCloseWorkingParent1
+  if !hasmapto('<Plug>DeltaVimCloseWorkingParent1')
+    nmap <unique> <Leader>W <Plug>DeltaVimCloseWorkingParent1
   endif
-  if !hasmapto('<Plug>DiffsToggleWorkingParent2')
-    nmap <unique> <Leader>2 <Plug>DiffsToggleWorkingParent2
+  if !hasmapto('<Plug>DeltaVimToggleWorkingParent2')
+    nmap <unique> <Leader>2 <Plug>DeltaVimToggleWorkingParent2
   endif
-  if !hasmapto('<Plug>DiffsOpenWorkingParent2')
-    nmap <unique> <Leader>q <Plug>DiffsOpenWorkingParent2
+  if !hasmapto('<Plug>DeltaVimOpenWorkingParent2')
+    nmap <unique> <Leader>q <Plug>DeltaVimOpenWorkingParent2
   endif
-  if !hasmapto('<Plug>DiffsCloseWorkingParent2')
-    nmap <unique> <Leader>Q <Plug>DiffsCloseWorkingParent2
+  if !hasmapto('<Plug>DeltaVimCloseWorkingParent2')
+    nmap <unique> <Leader>Q <Plug>DeltaVimCloseWorkingParent2
   endif
-  if !hasmapto('<Plug>DiffsOpenCurrentTrunk')
-    nmap <unique> <Leader>t <Plug>DiffsOpenCurrentTrunk
+  if !hasmapto('<Plug>DeltaVimOpenCurrentTrunk')
+    nmap <unique> <Leader>t <Plug>DeltaVimOpenCurrentTrunk
   endif
-  if !hasmapto('<Plug>DiffsCloseCurrentTrunk')
-    nmap <unique> <Leader>T <Plug>DiffsCloseCurrentTrunk
+  if !hasmapto('<Plug>DeltaVimCloseCurrentTrunk')
+    nmap <unique> <Leader>T <Plug>DeltaVimCloseCurrentTrunk
   endif
-  if !hasmapto('<Plug>DiffsOpenLastMergedTrunk')
-    nmap <unique> <Leader>m <Plug>DiffsOpenLastMergedTrunk
+  if !hasmapto('<Plug>DeltaVimOpenLastMergedTrunk')
+    nmap <unique> <Leader>m <Plug>DeltaVimOpenLastMergedTrunk
   endif
-  if !hasmapto('<Plug>DiffsCloseLastMergedTrunk')
-    nmap <unique> <Leader>M <Plug>DiffsCloseLastMergedTrunk
+  if !hasmapto('<Plug>DeltaVimCloseLastMergedTrunk')
+    nmap <unique> <Leader>M <Plug>DeltaVimCloseLastMergedTrunk
   endif
-  if !hasmapto('<Plug>DiffsOpenBranchOrigin')
-    nmap <unique> <Leader>b <Plug>DiffsOpenBranchOrigin
+  if !hasmapto('<Plug>DeltaVimOpenBranchOrigin')
+    nmap <unique> <Leader>b <Plug>DeltaVimOpenBranchOrigin
   endif
-  if !hasmapto('<Plug>DiffsCloseBranchOrigin')
-    nmap <unique> <Leader>B <Plug>DiffsCloseBranchOrigin
+  if !hasmapto('<Plug>DeltaVimCloseBranchOrigin')
+    nmap <unique> <Leader>B <Plug>DeltaVimCloseBranchOrigin
   endif
-  if !hasmapto('<Plug>DiffsOpenNewestRelease')
-    nmap <unique> <Leader>n <Plug>DiffsOpenNewestRelease
+  if !hasmapto('<Plug>DeltaVimOpenNewestRelease')
+    nmap <unique> <Leader>n <Plug>DeltaVimOpenNewestRelease
   endif
-  if !hasmapto('<Plug>DiffsCloseNewestRelease')
-    nmap <unique> <Leader>N <Plug>DiffsCloseNewestRelease
+  if !hasmapto('<Plug>DeltaVimCloseNewestRelease')
+    nmap <unique> <Leader>N <Plug>DeltaVimCloseNewestRelease
   endif
-  if !hasmapto('<Plug>DiffsOpenPriorRelease')
-    nmap <unique> <Leader>p <Plug>DiffsOpenPriorRelease
+  if !hasmapto('<Plug>DeltaVimOpenPriorRelease')
+    nmap <unique> <Leader>p <Plug>DeltaVimOpenPriorRelease
   endif
-  if !hasmapto('<Plug>DiffsClosePriorRelease')
-    nmap <unique> <Leader>P <Plug>DiffsClosePriorRelease
+  if !hasmapto('<Plug>DeltaVimClosePriorRelease')
+    nmap <unique> <Leader>P <Plug>DeltaVimClosePriorRelease
   endif
-  if !hasmapto('<Plug>DiffsToggleOrigBuffer')
-    nmap <unique> <Leader>| <Plug>DiffsToggleOrigBuffer
+  if !hasmapto('<Plug>DeltaVimToggleOrigBuffer')
+    nmap <unique> <Leader>| <Plug>DeltaVimToggleOrigBuffer
   endif
-  if !hasmapto('<Plug>DiffsCloseLogRevisions')
-    nmap <unique> <Leader>x <Plug>DiffsCloseLogRevisions
+  if !hasmapto('<Plug>DeltaVimCloseLogRevisions')
+    nmap <unique> <Leader>x <Plug>DeltaVimCloseLogRevisions
   endif
-  if !hasmapto('<Plug>LogOpen')
-    nmap <unique> <Leader>l <Plug>LogOpen
+  if !hasmapto('<Plug>DeltaVimLogOpen')
+    nmap <unique> <Leader>l <Plug>DeltaVimLogOpen
   endif
-  if !hasmapto('<Plug>LogClose')
-    nmap <unique> <Leader>L <Plug>LogClose
+  if !hasmapto('<Plug>DeltaVimLogClose')
+    nmap <unique> <Leader>L <Plug>DeltaVimLogClose
   endif
-  if !hasmapto('<Plug>Help')
-    nmap <unique> <Leader>h <Plug>Help
+  if !hasmapto('<Plug>DeltaVimHelp')
+    nmap <unique> <Leader>h <Plug>DeltaVimHelp
   endif
 endif
 
@@ -130,30 +130,30 @@ endif
 
 " Global maps, available for your own key bindings.
 "
-noremap <silent> <unique> <Plug>CloseAll :call <SID>closeAll()<CR>
-noremap <silent> <unique> <Plug>DiffsCloseAll :call <SID>closeAllDiffs()<CR>
-noremap <silent> <unique> <Plug>DiffsCloseWindow :call <SID>closeCurrentDiff()<CR>
-noremap <silent> <unique> <Plug>DiffsToggleWorkingParent1 :call <SID>toggleWorkingParent1Diff()<CR>
-noremap <silent> <unique> <Plug>DiffsOpenWorkingParent1 :call <SID>openWorkingParent1Diff()<CR>
-noremap <silent> <unique> <Plug>DiffsCloseWorkingParent1 :call <SID>closeWorkingParent1Diff()<CR>
-noremap <silent> <unique> <Plug>DiffsToggleWorkingParent2 :call <SID>toggleWorkingParent2Diff()<CR>
-noremap <silent> <unique> <Plug>DiffsOpenWorkingParent2 :call <SID>openWorkingParent2Diff()<CR>
-noremap <silent> <unique> <Plug>DiffsCloseWorkingParent2 :call <SID>closeWorkingParent2Diff()<CR>
-noremap <silent> <unique> <Plug>DiffsOpenCurrentTrunk :call <SID>openTrunkDiff()<CR>
-noremap <silent> <unique> <Plug>DiffsCloseCurrentTrunk :call <SID>closeTrunkDiff()<CR>
-noremap <silent> <unique> <Plug>DiffsOpenLastMergedTrunk :call <SID>openLastMergedTrunkDiff()<CR>
-noremap <silent> <unique> <Plug>DiffsCloseLastMergedTrunk :call <SID>closeLastMergedTrunkDiff()<CR>
-noremap <silent> <unique> <Plug>DiffsOpenBranchOrigin :call <SID>openBranchOriginDiff()<CR>
-noremap <silent> <unique> <Plug>DiffsCloseBranchOrigin :call <SID>closeBranchOriginDiff()<CR>
-noremap <silent> <unique> <Plug>DiffsOpenPriorRelease :call <SID>openPriorReleaseDiff()<CR>
-noremap <silent> <unique> <Plug>DiffsClosePriorRelease :call <SID>closePriorReleaseDiff()<CR>
-noremap <silent> <unique> <Plug>DiffsOpenNewestRelease :call <SID>openNewestReleaseDiff()<CR>
-noremap <silent> <unique> <Plug>DiffsCloseNewestRelease :call <SID>closeNewestReleaseDiff()<CR>
-noremap <silent> <unique> <Plug>DiffsCloseLogRevisions :call <SID>closeLogRevisionDiffs()<CR>
-noremap <silent> <unique> <Plug>DiffsToggleOrigBuffer :call <SID>toggleOrigBufferDiffMode()<CR>
-noremap <silent> <unique> <Plug>LogOpen :call <SID>openLog()<CR>
-noremap <silent> <unique> <Plug>LogClose :call <SID>closeLog()<CR>
-noremap <silent> <unique> <Plug>Help :call <SID>help()<CR>
+noremap <silent> <unique> <Plug>DeltaVimCloseAll :call <SID>closeAll()<CR>
+noremap <silent> <unique> <Plug>DeltaVimCloseAllDiffs :call <SID>closeAllDiffs()<CR>
+noremap <silent> <unique> <Plug>DeltaVimCloseWindow :call <SID>closeCurrentDiff()<CR>
+noremap <silent> <unique> <Plug>DeltaVimToggleWorkingParent1 :call <SID>toggleWorkingParent1Diff()<CR>
+noremap <silent> <unique> <Plug>DeltaVimOpenWorkingParent1 :call <SID>openWorkingParent1Diff()<CR>
+noremap <silent> <unique> <Plug>DeltaVimCloseWorkingParent1 :call <SID>closeWorkingParent1Diff()<CR>
+noremap <silent> <unique> <Plug>DeltaVimToggleWorkingParent2 :call <SID>toggleWorkingParent2Diff()<CR>
+noremap <silent> <unique> <Plug>DeltaVimOpenWorkingParent2 :call <SID>openWorkingParent2Diff()<CR>
+noremap <silent> <unique> <Plug>DeltaVimCloseWorkingParent2 :call <SID>closeWorkingParent2Diff()<CR>
+noremap <silent> <unique> <Plug>DeltaVimOpenCurrentTrunk :call <SID>openTrunkDiff()<CR>
+noremap <silent> <unique> <Plug>DeltaVimCloseCurrentTrunk :call <SID>closeTrunkDiff()<CR>
+noremap <silent> <unique> <Plug>DeltaVimOpenLastMergedTrunk :call <SID>openLastMergedTrunkDiff()<CR>
+noremap <silent> <unique> <Plug>DeltaVimCloseLastMergedTrunk :call <SID>closeLastMergedTrunkDiff()<CR>
+noremap <silent> <unique> <Plug>DeltaVimOpenBranchOrigin :call <SID>openBranchOriginDiff()<CR>
+noremap <silent> <unique> <Plug>DeltaVimCloseBranchOrigin :call <SID>closeBranchOriginDiff()<CR>
+noremap <silent> <unique> <Plug>DeltaVimOpenPriorRelease :call <SID>openPriorReleaseDiff()<CR>
+noremap <silent> <unique> <Plug>DeltaVimClosePriorRelease :call <SID>closePriorReleaseDiff()<CR>
+noremap <silent> <unique> <Plug>DeltaVimOpenNewestRelease :call <SID>openNewestReleaseDiff()<CR>
+noremap <silent> <unique> <Plug>DeltaVimCloseNewestRelease :call <SID>closeNewestReleaseDiff()<CR>
+noremap <silent> <unique> <Plug>DeltaVimCloseLogRevisions :call <SID>closeLogRevisionDiffs()<CR>
+noremap <silent> <unique> <Plug>DeltaVimToggleOrigBuffer :call <SID>toggleOrigBufferDiffMode()<CR>
+noremap <silent> <unique> <Plug>DeltaVimLogOpen :call <SID>openLog()<CR>
+noremap <silent> <unique> <Plug>DeltaVimLogClose :call <SID>closeLog()<CR>
+noremap <silent> <unique> <Plug>DeltaVimHelp :call <SID>help()<CR>
 
 " Whenever any buffer window goes away, if there are no more diff windows
 " remaining, then turn off diff mode in the principal buffer.
@@ -549,13 +549,13 @@ func s:openDiff(diffname, readArg, rev, annotation, label)
         call s:restoreWrapMode()
         echoerr substitute(v:exception, '^Vim(\a\+):', '', '')
       endtry
-      augroup TuentiMercurialDiff
+      augroup DeltaVim_Hg
         exe 'autocmd BufDelete <buffer> call s:cleanUpDiff('.string(a:diffname).')'
       augroup END
       wincmd x
       setlocal scrollbind
       diffthis
-      augroup TuentiMercurialDiff
+      augroup DeltaVim_Hg
         autocmd BufWinLeave <buffer> nested call s:closeAll()
         autocmd BufWinEnter <buffer> call s:cleanUp()
       augroup END
@@ -712,7 +712,7 @@ func s:openLog()
     nnoremap <buffer> <silent> m :call <SID>gotoOrigWindow()<CR>
     nnoremap <buffer> <silent> q :call <SID>closeLog()<CR>
     " housekeeping for buffer close
-    augroup TuentiMercurialDiff
+    augroup DeltaVim_Hg
       autocmd BufDelete <buffer> call s:cleanUp()
     augroup END
   endif
