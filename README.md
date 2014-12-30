@@ -80,6 +80,71 @@ Once the plugin is installed, start [Vim][] and type the following command:
 
 This should display a page of usage instructions for the Delta Vim plugin.
 
+Troubleshooting
+---------------
+
+If the `\h` command does not do anything, then test if the plugin was loaded by
+starting a new Vim instance and typing the following command:
+
+    :echo g:loaded_DeltaVim_Hg
+
+This should print a single `1` on the bottom line of the Vim window.  If it
+does not, then the plugin was not loaded.  This could be for various reasons:
+
+ * you are not actually running [Vim][] -- perhaps you are running [Elvis][],
+   [nvi][], [vile][] or the tiny **vi** clone in [Busybox][]
+
+ * Vim is starting in [vi compatibility mode][vim top 10]
+
+ * the plugin files were not installed correctly (see STEP 2 above)
+
+If the above command prints `1`, then test whether the plugin's key mappings
+were set up by starting a new Vim instance and typing the following command:
+
+    :echo hasmapto('<Plug>DeltaVimHelp')
+
+If this prints `0` on the bottom line of the Vim window, then the plugin's key
+maps were not set up.  Test the reason by starting a new Vim instance and
+typing the following Vim command:
+
+    :echo exists('no_plugin_maps') + exists('no_deltavim_plugin_maps')
+
+ * if this prints a `1` (or `2`) at the bottom of the Vim window then another
+   plugin file or your [vimrc][] file has explicitly disabled key mappings by
+   setting one (or both) of the Vim global variables `no_plugin_maps` and
+   `no_deltavim_plugin_maps`.  You will have to search through the source code of
+   these files to discover where this is done, then decide whether to reverse
+   the action to let the plugin set up its own key mappings, or whether to
+   leave it and set up your own key mappings.
+
+ * if the above command prints `0` then there is another problem preventing the
+   key mappings from being set up.  Please investigate in depth if you can, and
+   report the problem as a [delta.vim issue][].
+
+If the *echo hasmapto* command above prints `1` on the bottom line of the Vim
+window, then the plugin should have set up its key mapping to the help command.
+In this case, there are several reasons why the `\h` command does not work:
+
+ * Vim's `<Leader>` character is not `\` (backslash); test this by starting a
+   new Vim instance and typing the following command:
+
+        :echo mapleader
+
+   This will print the character that should be used instead of `\` in the `\h`
+   command; for example, if it prints `,` then the help command is `,h`
+
+ * if the `<Leader>` character is `\`, then possibly another plugin file or
+   your [vimrc][] file already sets up a different key mapping for the
+   `<Plug>DeltaVimHelp` command, which will have the effect of overriding the
+   plugin's `\h` mapping.  You will have to search through the source code of
+   these files to discover where the mapping is made, and this will reveal the
+   command you must type to reveal the help instructions.
+
+ * If no other key mapping to `<Plug>DeltaVimHelp` is set up, then there is
+   another problem preventing the help key mapping from working.  Please
+   investigate in depth if you can, and report the problem as a [delta.vim
+   issue][].
+
 Copyright and license
 ---------------------
 
@@ -111,6 +176,7 @@ from Tuenti.
 This document is available under the [Creative Commons Attribution 4.0 International licence][CC BY 4.0].
 
 [delta.vim]: https://github.com/quixotique/delta.vim
+[delta.vim issue]: https://github.com/quixotique/delta.vim/issues
 [Vim]: http://www.vim.org/
 [Mercurial]: http://mercurial.selenic.com/
 [GPL3]: ./LICENSE-SOFTWARE.md
