@@ -76,14 +76,14 @@ How to use
 
 Once the plugin is installed, start [Vim][] and type the following command:
 
-    \h
+    \?
 
 This should display a page of usage instructions for the Delta Vim plugin.
 
 Troubleshooting
 ---------------
 
-If the `\h` command does not do anything, then test if the plugin was loaded by
+If the `\?` command does not do anything, then test if the plugin was loaded by
 starting a new Vim instance and typing the following command:
 
     :echo g:loaded_DeltaVim_Hg
@@ -123,20 +123,20 @@ typing the following Vim command:
 
 If the *echo hasmapto* command above prints `1` on the bottom line of the Vim
 window, then the plugin should have set up its key mapping to the help command.
-In this case, there are several reasons why the `\h` command does not work:
+In this case, there are several reasons why the `\?` command does not work:
 
  * Vim's `<Leader>` character is not `\` (backslash); test this by starting a
    new Vim instance and typing the following command:
 
         :echo mapleader
 
-   This will print the character that should be used instead of `\` in the `\h`
-   command; for example, if it prints `,` then the help command is `,h`
+   This will print the character that should be used instead of `\` in the `\?`
+   command; for example, if it prints `,` then the help command is `,?`
 
  * if the `<Leader>` character is `\`, then possibly another plugin file or
    your [vimrc][] file already sets up a different key mapping for the
    `<Plug>DeltaVimHelp` command, which will have the effect of overriding the
-   plugin's `\h` mapping.  You will have to search through the source code of
+   plugin's `\?` mapping.  You will have to search through the source code of
    these files to discover where the mapping is made, and this will reveal the
    command you must type to reveal the help instructions.
 
