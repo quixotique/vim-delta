@@ -1,9 +1,9 @@
 delta.vim
 =========
 
-[Vim][] plugin for opening and managing diff windows between log changesets,
-branch origins, merge parents and the working copy in a [Mercurial][]
-repository.
+A [Vim][] plugin for opening and managing diff windows between the working
+copy, previous changesets, current branch head and origin, and merge parents in
+any [Mercurial][] repository.  Support for [Git][] repositories is coming soon!
 
 Installation
 ------------
@@ -11,43 +11,43 @@ Installation
 The following instructions should work on [POSIX.2][] compliant systems like
 [GNU/Linux][] that offer a [Unix shell][] command-line interface.
 
-### STEP 1 - Fetch the Vim plugin from [GitHub][delta.vim]
+### STEP 1 - Fetch the Vim plugin from [GitHub][vim-delta]
 
 This step places the plugin files into a sub-directory of your home directory
-called `delta.vim`.  You can use a different name and location.
+called `vim-delta`.  You can use a different name and location.
 
  * EITHER clone it into a local directory using [Git][]:
 
         cd
-        git clone https://github.com/quixotique/delta.vim.git
+        git clone https://github.com/quixotique/vim-delta.git
 
  * OR fetch the files as a [Zip][] archive, unpack them and rename the unpacked directory:
 
         cd /tmp
-        wget https://github.com/quixotique/delta.vim/archive/master.zip
+        wget https://github.com/quixotique/vim-delta/archive/master.zip
         unzip /tmp/master.zip
         cd
-        mv /tmp/delta.vim-master delta.vim
+        mv /tmp/vim-delta-master vim-delta
 
  * OR fetch each file individually (the following commands may be incorrect or
    incomplete if files have been renamed or added since these instructions were
    written):
 
         cd
-        mkdir delta.vim
-        cd delta.vim
+        mkdir vim-delta
+        cd vim-delta
         mkdir plugin
         cd plugin
-        wget https://raw.githubusercontent.com/quixotique/delta.vim/master/plugin/delta.vim
+        wget https://raw.githubusercontent.com/quixotique/vim-delta/master/plugin/delta.vim
         cd ..
         mkdir syntax
         cd syntax
-        wget https://raw.githubusercontent.com/quixotique/delta.vim/master/syntax/hglogcompact.vim
+        wget https://raw.githubusercontent.com/quixotique/vim-delta/master/syntax/hglogcompact.vim
 
 ### STEP 2 - Add the plugin to Vim
 
 The following instructions assume that STEP 1 placed the plugin files under the
-`delta.vim` sub-directory of your home directory.  If you placed them in
+`vim-delta` sub-directory of your home directory.  If you placed them in
 another location, you must adapt the following instructions.
 
  * IF YOU USE [Pathogen][], move the cloned/unpacked/fetched plugin
@@ -55,21 +55,21 @@ another location, you must adapt the following instructions.
 
         cd
         mkdir -p .vim/bundle
-        mv delta.vim .vim/bundle
+        mv vim-delta .vim/bundle
 
  * OR add the cloned/unpacked/fetched directory created in STEP 1 to your Vim
    [runtimepath][] by adding the following line to your [vimrc][] file:
 
-        set runtimepath^=~/delta.vim
+        set runtimepath^=~/vim-delta
 
  * OR copy the cloned/unpacked/fetched files created in STEP 1 into your Vim
    settings:
 
         cd
         mkdir -p .vim/plugin
-        cp delta.vim/plugin/*.vim .vim/plugin
+        cp vim-delta/plugin/*.vim .vim/plugin
         mkdir -p .vim/syntax
-        cp delta.vim/syntax/*.vim .vim/syntax
+        cp vim-delta/syntax/*.vim .vim/syntax
 
 How to use
 ----------
@@ -119,7 +119,7 @@ typing the following Vim command:
 
  * if the above command prints `0` then there is another problem preventing the
    key mappings from being set up.  Please investigate in depth if you can, and
-   report the problem as a [delta.vim issue][].
+   report the problem as a [vim-delta issue][].
 
 If the *echo hasmapto* command above prints `1` on the bottom line of the Vim
 window, then the plugin should have set up its key mapping to the help command.
@@ -142,7 +142,7 @@ In this case, there are several reasons why the `\?` command does not work:
 
  * If no other key mapping to `<Plug>DeltaVimHelp` is set up, then there is
    another problem preventing the help key mapping from working.  Please
-   investigate in depth if you can, and report the problem as a [delta.vim
+   investigate in depth if you can, and report the problem as a [vim-delta
    issue][].
 
 Copyright and license
@@ -167,7 +167,7 @@ History
 The Delta Vim plugin for [Mercurial][] was originally developed in 2011 by
 [Andrew Bettison][] as an employee of [Tuenti Technologies, S.L.][] (in Madrid,
 Spain).  Andrew later modified and improved the plugin in his own capacity, and
-released it on [GitHub][delta.vim] in 2014 under public license with permission
+released it on [GitHub][vim-delta] in 2014 under public license with permission
 from Tuenti.
 
 -----
@@ -175,8 +175,8 @@ from Tuenti.
 ![CC-BY-4.0](./cc-by-4.0.png)
 This document is available under the [Creative Commons Attribution 4.0 International licence][CC BY 4.0].
 
-[delta.vim]: https://github.com/quixotique/delta.vim
-[delta.vim issue]: https://github.com/quixotique/delta.vim/issues
+[vim-delta]: https://github.com/quixotique/vim-delta
+[vim-delta issue]: https://github.com/quixotique/vim-delta/issues
 [Vim]: http://www.vim.org/
 [Mercurial]: http://mercurial.selenic.com/
 [GPL3]: ./LICENSE-SOFTWARE.md
