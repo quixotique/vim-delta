@@ -23,8 +23,9 @@ set cpo&vim
 " Save the <Leader> char as it was when the mappings were defined, so the help
 " message can quote the correct key sequences even if mapleader gets changed.
 let s:helpleader = g:mapleader
-" This should be integrated into the Vim help system.
+" TODO This should be integrated into the Vim help system.
 func s:help()
+  " TODO Adapt this message to the current window width
   let m = s:helpleader
   echomsg 'cmd  action          description'
   echomsg '================================'
@@ -74,6 +75,7 @@ endfunc
 " PUBLIC INTERFACE
 
 " Default key bindings, only set where no binding already has been defined.
+" TODO Allow user to define their own prefix, use <Leader> if no prefix defined
 if !exists('no_plugin_maps') && !exists('no_deltavim_plugin_maps')
   if !hasmapto('<Plug>DeltaVimHelp')
     nmap <unique> <Leader>? <Plug>DeltaVimHelp
@@ -160,7 +162,7 @@ if !exists(':Delta')
   command -nargs=1 Delta call <SID>openRevisionDiff(<q-args>)
 endif
 
-" Global maps, available for your own key bindings.
+" Global maps, available for user's own key bindings.
 "
 noremap <silent> <unique> <Plug>DeltaVimHelp :call <SID>help()<CR>
 noremap <silent> <unique> <Plug>DeltaVimLogOpen :call <SID>openLog()<CR>
