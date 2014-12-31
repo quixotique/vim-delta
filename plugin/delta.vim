@@ -31,6 +31,8 @@ func s:help()
   echomsg m.'?   Help            Print this message'
   echomsg m.'l   Log             Open a new window listing the log of all changes to the current file (see below for key bindings available in the log window)'
   echomsg m.'L                   Close the log window opened with '.m.'l'
+  echomsg m.'w   Working copy    Open a new diff window on the working copy (uncommitted files)'
+  echomsg m.'W                   Close the diff window opened with '.m.'w'
   echomsg m.'h   Head            Open a new diff window on the current branch head (Git HEAD, Hg parent 1)'
   echomsg m.'H                   Close the diff window opened with '.m.'h'
   echomsg m.'t   Trunk           Open a new diff window on the trunk branch head (Git "master", Hg "default")'
@@ -81,6 +83,12 @@ if !exists('no_plugin_maps') && !exists('no_deltavim_plugin_maps')
   endif
   if !hasmapto('<Plug>DeltaVimLogClose')
     nmap <unique> <Leader>L <Plug>DeltaVimLogClose
+  endif
+  if !hasmapto('<Plug>DeltaVimOpenWorking')
+    nmap <unique> <Leader>w <Plug>DeltaVimOpenWorking
+  endif
+  if !hasmapto('<Plug>DeltaVimCloseWorking')
+    nmap <unique> <Leader>W <Plug>DeltaVimCloseWorking
   endif
   if !hasmapto('<Plug>DeltaVimOpenHead')
     nmap <unique> <Leader>h <Plug>DeltaVimOpenHead
@@ -157,6 +165,8 @@ endif
 noremap <silent> <unique> <Plug>DeltaVimHelp :call <SID>help()<CR>
 noremap <silent> <unique> <Plug>DeltaVimLogOpen :call <SID>openLog()<CR>
 noremap <silent> <unique> <Plug>DeltaVimLogClose :call <SID>closeLog()<CR>
+noremap <silent> <unique> <Plug>DeltaVimOpenWorking :call <SID>openWorkingDiff()<CR>
+noremap <silent> <unique> <Plug>DeltaVimCloseWorking :call <SID>closeWorkingDiff()<CR>
 noremap <silent> <unique> <Plug>DeltaVimOpenHead :call <SID>openHeadDiff()<CR>
 noremap <silent> <unique> <Plug>DeltaVimCloseHead :call <SID>closeHeadDiff()<CR>
 noremap <silent> <unique> <Plug>DeltaVimOpenTrunk :call <SID>openTrunkDiff()<CR>
@@ -183,10 +193,13 @@ noremap <silent> <unique> <Plug>DeltaVimCloseMergeIncoming :call <SID>closeMerge
 " remaining, then turn off diff mode in the principal buffer.
 autocmd BufHidden * call s:cleanUp()
 
+" Whenever a buffer is written, refresh all the diff windows
+autocmd BufWritePost * call s:refreshWorkingCopyDiff()
+
 " ------------------------------------------------------------------------------
 " APPLICATION FUNCTIONS
 
-let s:allDiffNames = ['parent1', 'parent2', 'branchOrigin', 'trunk', 'newestRelease', 'priorRelease', 'revision1', 'revision2']
+let s:allDiffNames = ['working', 'parent1', 'parent2', 'branchOrigin', 'trunk', 'newestRelease', 'priorRelease', 'revision1', 'revision2']
 
 " Close all diff windows and the log window.  This operation should leave no
 " windows visible that were created by any mappings or functions in this plugin.
@@ -212,6 +225,21 @@ func s:closeCurrentDiff()
       call s:closeDiff(diffname)
     endif
   endfor
+endfunc
+
+" After a buffer is written, check if the working copy diff is visible.  If
+" so, then refresh it.
+func s:refreshWorkingCopyDiff()
+  if exists("t:workingDiffBuffer")
+    exe bufwinnr(t:workingDiffBuffer) 'wincmd w'
+    setlocal modifiable
+    silent %d
+    silent exe '1read' '#'
+    silent 1d
+    setlocal nomodifiable
+    diffupdate
+    wincmd p
+  endif
 endfunc
 
 " After any buffer is hidden, check if any diff buffers are still visible.  If
@@ -251,6 +279,16 @@ endfunc
 
 func s:closeRevisionDiff(rev)
   call s:closeDiff('revision1')
+endfunc
+
+func s:openWorkingDiff()
+  try
+    call s:openDiff('working', '#', '', '', '')
+  endtry
+endfunc
+
+func s:closeWorkingDiff()
+  call s:closeDiff('working')
 endfunc
 
 func s:openHeadDiff()
