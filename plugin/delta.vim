@@ -53,8 +53,8 @@ func s:help()
   echomsg m.'|   Toggle main     Toggle the diff mode of the main file window. This is useful when two diff windows are open, to see only the changes between them'
   echomsg ' '
   echomsg 'During a merge:'
-" echomsg m.'a   Common ancestor Open a new diff window on common merge ancestor (Git stage 1)'
-" echomsg m.'A                   Close the diff window opened with '.m.'a'
+  echomsg m.'a   Common ancestor Open a new diff window on common merge ancestor (Git stage 1)'
+  echomsg m.'A                   Close the diff window opened with '.m.'a'
   echomsg m.'b   Merge branch    Open a new diff window on merge target branch (Git stage 2, Hg parent 1)'
   echomsg m.'B                   Close the diff window opened with '.m.'b'
   echomsg m.'m   Merge incoming  Open a new diff window on incoming merge head (Git stage 3, Hg parent 2)'
@@ -137,12 +137,12 @@ if !exists('no_plugin_maps') && !exists('no_deltavim_plugin_maps')
   if !hasmapto('<Plug>DeltaVimToggleOrigBuffer')
     nmap <unique> <Leader>| <Plug>DeltaVimToggleOrigBuffer
   endif
-" if !hasmapto('<Plug>DeltaVimOpenCommonAncestor')
-"   nmap <unique> <Leader>a <Plug>DeltaVimOpenCommonAncestor
-" endif
-" if !hasmapto('<Plug>DeltaVimCloseCommonAncestor')
-"   nmap <unique> <Leader>A <Plug>DeltaVimCloseCommonAncestor
-" endif
+  if !hasmapto('<Plug>DeltaVimOpenCommonAncestor')
+    nmap <unique> <Leader>a <Plug>DeltaVimOpenMergeCommonAncestor
+  endif
+  if !hasmapto('<Plug>DeltaVimCloseCommonAncestor')
+    nmap <unique> <Leader>A <Plug>DeltaVimCloseMergeCommonAncestor
+  endif
   if !hasmapto('<Plug>DeltaVimOpenMergeBranch')
     nmap <unique> <Leader>b <Plug>DeltaVimOpenMergeBranch
   endif
@@ -184,8 +184,8 @@ noremap <silent> <unique> <Plug>DeltaVimCloseLogRevisions :call <SID>closeLogRev
 noremap <silent> <unique> <Plug>DeltaVimCloseWindow :call <SID>closeCurrentDiff()<CR>
 noremap <silent> <unique> <Plug>DeltaVimCloseAll :call <SID>closeAll()<CR>
 noremap <silent> <unique> <Plug>DeltaVimToggleOrigBuffer :call <SID>toggleOrigBufferDiffMode()<CR>
-"noremap <silent> <unique> <Plug>DeltaVimOpenCommonAncestor :call <SID>openCommonAncestorDiff()<CR>
-"noremap <silent> <unique> <Plug>DeltaVimCloseCommonAncestor :call <SID>closeCommonAncestorDiff()<CR>
+noremap <silent> <unique> <Plug>DeltaVimOpenMergeCommonAncestor :call <SID>openMergeCommonAncestorDiff()<CR>
+noremap <silent> <unique> <Plug>DeltaVimCloseMergeCommonAncestor :call <SID>closeMergeCommonAncestorDiff()<CR>
 noremap <silent> <unique> <Plug>DeltaVimOpenMergeBranch :call <SID>openMergeBranchDiff()<CR>
 noremap <silent> <unique> <Plug>DeltaVimCloseMergeBranch :call <SID>closeMergeBranchDiff()<CR>
 noremap <silent> <unique> <Plug>DeltaVimOpenMergeIncoming :call <SID>openMergeIncomingDiff()<CR>
@@ -201,7 +201,7 @@ autocmd BufWritePost * call s:refreshWorkingCopyDiff()
 " ------------------------------------------------------------------------------
 " APPLICATION FUNCTIONS
 
-let s:allDiffNames = ['working', 'parent1', 'parent2', 'branchOrigin', 'trunk', 'newestRelease', 'priorRelease', 'revision1', 'revision2']
+let s:allDiffNames = ['working', 'ancestor', 'parent1', 'parent2', 'branchOrigin', 'trunk', 'newestRelease', 'priorRelease', 'revision1', 'revision2']
 
 " Close all diff windows and the log window.  This operation should leave no
 " windows visible that were created by any mappings or functions in this plugin.
@@ -301,6 +301,19 @@ endfunc
 
 func s:closeHeadDiff()
   call s:closeDiff('parent1')
+endfunc
+
+func s:openMergeCommonAncestorDiff()
+  let rev = get(s:getHgRevisions('--rev "ancestor(parents())"'), -1, '')
+  if rev != ''
+    try
+      call s:openHgDiff('ancestor', rev, '')
+    endtry
+  endif
+endfunc
+
+func s:closeMergeCommonAncestorDiff()
+  call s:closeDiff('ancestor')
 endfunc
 
 "func s:toggleMergeBranchDiff()
