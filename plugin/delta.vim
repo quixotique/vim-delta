@@ -564,7 +564,7 @@ func s:openHgDiff(diffname, rev, label)
   if len(info)
     let annotation = info.shortnode.' '.info.shortdate
     try
-      call s:openDiff(a:diffname, '!hg --config defaults.cat= cat -r '.info.rev.' #', info.rev, annotation, a:label)
+      call s:openDiff(a:diffname, '!cd %:h >/dev/null && hg --config defaults.cat= cat -r '.info.rev.' %', info.rev, annotation, a:label)
     endtry
   endif
 endfunc
@@ -603,6 +603,18 @@ func s:openDiff(diffname, readArg, rev, annotation, label)
       let ft = &filetype
       let filename = expand("%")
       let filedir = expand('%:h')
+      " substitute all '%' in the read argument with the real path of this file buffer
+      " substitute all '%:h' in the read argument with the real diirectory of this file buffer
+      " escape shell metacharacters if the read argument is a shell command (starts with '!')
+      let realfiledir = resolve(filedir)
+      let realfilename = resolve(filename)
+      let readarg = a:readArg
+      if readarg[0] == '!'
+        let realfiledir = shellescape(realfiledir)
+        let realfilename = shellescape(realfilename)
+      endif
+      let readarg = substitute(readarg, '%:h', realfiledir, "")
+      let readarg = substitute(readarg, '%', realfilename, "")
       set equalalways
       set eadirection=hor
       vnew
@@ -617,7 +629,7 @@ func s:openDiff(diffname, readArg, rev, annotation, label)
       endif
       let displayName .= ' ' . ((a:label != '') ? a:label : a:diffname)
       silent exe 'file' fnameescape(displayName)
-      silent exe '1read' a:readArg
+      silent exe '1read' readarg
       1d
       let &l:filetype = ft
       setlocal buftype=nofile
