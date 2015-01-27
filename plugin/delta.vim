@@ -754,14 +754,15 @@ func s:openLog()
     let b:fileDir = filedir
     " give the buffer a helpful name
     silent exe 'file' fnameescape('log '.filepath)
+    let realfilepath = resolve(filepath)
     " read the mercurial log into it -- all ancestors of the current working revision
     if s:isWorkingMerge()
       " if currently merging, show '1' and '2' flags to indicate which revisions contributed to each parent
-      silent exe '$read !hg --config defaults.log= log --rev "ancestors(p1())-ancestors(ancestor(p1(),p2()))" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}|1 +{parents}|{desc|firstline}\n" '.shellescape(filepath)
-      silent exe '$read !hg --config defaults.log= log --rev "ancestors(p2())-ancestors(ancestor(p1(),p2()))" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}| 2+{parents}|{desc|firstline}\n" '.shellescape(filepath)
-      silent exe '$read !hg --config defaults.log= log --rev "ancestors(ancestor(p1(),p2()))" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}|12+{parents}|{desc|firstline}\n" '.shellescape(filepath)
+      silent exe '$read !hg --config defaults.log= log --rev "ancestors(p1())-ancestors(ancestor(p1(),p2()))" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}|1 +{parents}|{desc|firstline}\n" '.shellescape(realfilepath)
+      silent exe '$read !hg --config defaults.log= log --rev "ancestors(p2())-ancestors(ancestor(p1(),p2()))" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}| 2+{parents}|{desc|firstline}\n" '.shellescape(realfilepath)
+      silent exe '$read !hg --config defaults.log= log --rev "ancestors(ancestor(p1(),p2()))" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}|12+{parents}|{desc|firstline}\n" '.shellescape(realfilepath)
     else
-      silent exe '$read !hg --config defaults.log= log --rev "ancestors(parents())" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}|+{parents}|{desc|firstline}\n" '.shellescape(filepath)
+      silent exe '$read !hg --config defaults.log= log --rev "ancestors(parents())" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}|+{parents}|{desc|firstline}\n" '.shellescape(realfilepath)
     endif
     1d
     " sort by reverse date (most recent first)
