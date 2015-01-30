@@ -572,7 +572,7 @@ func s:openHgDiff(diffname, rev, label)
   if len(info)
     let annotation = info.shortnode.' '.info.shortdate
     try
-      call s:openDiff(a:diffname, '!cd %:h >/dev/null && hg --config defaults.cat= cat -r '.info.rev.' %', info.rev, annotation, a:label)
+      call s:openDiff(a:diffname, '!cd %:h >/dev/null && hg --config defaults.cat= cat -r '.info.rev.' %:t', info.rev, annotation, a:label)
     endtry
   endif
 endfunc
@@ -609,29 +609,17 @@ func s:openDiff(diffname, readArg, rev, annotation, label)
       " turn off wrap mode in the original file buffer
       call s:setBufferWrapMode(0)
       let ft = &filetype
-      let filename = expand("%")
-      let filedir = expand('%:h')
-      " substitute all '%' in the read argument with the real path of this file buffer
-      " substitute all '%:h' in the read argument with the real diirectory of this file buffer
-      " escape shell metacharacters if the read argument is a shell command (starts with '!')
-      let realfilename = resolve(filename)
-      let realfiledir = fnamemodify(filename, ":h")
-      let readarg = a:readArg
-      if readarg[0] == '!'
-        let realfiledir = shellescape(realfiledir)
-        let realfilename = shellescape(realfilename)
-      endif
-      let readarg = substitute(readarg, '%:h', realfiledir, "")
-      let readarg = substitute(readarg, '%', realfilename, "")
+      let readarg = s:expandReadarg(a:readArg, resolve(expand('%')))
+      let realfiledir = fnamemodify(resolve(expand('%')), ':h')
       set equalalways
       set eadirection=hor
       vnew
-      let b:fileDir = filedir
+      let b:fileDir = realfiledir
       let b:revision = a:rev
       " turn off wrap mode in the new diff buffer
       call s:setBufferWrapMode(0)
       exe 'let' varname "=" bufnr("%")
-      let displayName = filename
+      let displayName = expand('%')
       if a:annotation != ''
         let displayName .= ' '.a:annotation
       endif
@@ -672,6 +660,21 @@ func s:openDiff(diffname, readArg, rev, annotation, label)
       diffupdate
     endif
   endif
+endfunc
+
+func s:ident(text)
+  return a:text
+endfunc
+
+" Transform a string into text suitable as an argument to ':read':
+"  - substitute all '%' with the 'percent' path
+"  - substitute all '%:h' with the head of the 'percent' path
+"  - substitute all '%:t' with the tail of the 'percent' path
+"  - escape shell metacharacters in all substituted values if the argument is a
+"    shell command (starts with '!')
+func s:expandReadarg(text, percent)
+  let escapefn = a:text[0] == '!' ? 'shellescape' : 's:ident'
+  return substitute(a:text, '%\(:[ht~.]\|\)', '\='.escapefn.'(fnamemodify(a:percent, submatch(1)))', "g")
 endfunc
 
 " Put the focus in the original diff file window and return 1 if it exists.
@@ -768,7 +771,8 @@ func s:openLog()
     " figure out the file name and number of the current buffer
     let t:origDiffBuffer = bufnr("%")
     let filepath = expand('%')
-    let filedir = expand('%:h')
+    let realfilepath = resolve(filepath)
+    let realfiledir = fnamemodify(realfilepath, ':h')
     " save the current wrap modes to restore them later
     call s:recordWrapMode()
     augroup DeltaVim_Hg
@@ -776,21 +780,20 @@ func s:openLog()
       " all associated buffers, including the log buffer.
       autocmd BufWinLeave <buffer> nested call s:closeAll()
     augroup END
-    " open the log navigation window
+    " create the log navigation window
     botright 10 new
     let t:hgLogBuffer = bufnr('%')
-    let b:fileDir = filedir
+    let b:fileDir = realfiledir
     " give the buffer a helpful name
     silent exe 'file' fnameescape('log '.filepath)
-    let realfilepath = resolve(filepath)
     " read the mercurial log into it -- all ancestors of the current working revision
     if s:isWorkingMerge()
       " if currently merging, show '1' and '2' flags to indicate which revisions contributed to each parent
-      silent exe '$read !hg --config defaults.log= log --rev "ancestors(p1())-ancestors(ancestor(p1(),p2()))" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}|1 +{parents}|{desc|firstline}\n" '.shellescape(realfilepath)
-      silent exe '$read !hg --config defaults.log= log --rev "ancestors(p2())-ancestors(ancestor(p1(),p2()))" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}| 2+{parents}|{desc|firstline}\n" '.shellescape(realfilepath)
-      silent exe '$read !hg --config defaults.log= log --rev "ancestors(ancestor(p1(),p2()))" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}|12+{parents}|{desc|firstline}\n" '.shellescape(realfilepath)
+      silent exe '$read '.s:expandReadarg('!cd %:h >/dev/null && hg --config defaults.log= log --rev "ancestors(p1())-ancestors(ancestor(p1(),p2()))" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}|1 +{parents}|{desc|firstline}\n" %:t', realfilepath)
+      silent exe '$read '.s:expandReadarg('!cd %:h >/dev/null && hg --config defaults.log= log --rev "ancestors(p2())-ancestors(ancestor(p1(),p2()))" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}| 2+{parents}|{desc|firstline}\n" %:t', realfilepath)
+      silent exe '$read '.s:expandReadarg('!cd %:h >/dev/null && hg --config defaults.log= log --rev "ancestors(ancestor(p1(),p2()))" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}|12+{parents}|{desc|firstline}\n" %:t', realfilepath)
     else
-      silent exe '$read !hg --config defaults.log= log --rev "ancestors(parents())" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}|+{parents}|{desc|firstline}\n" '.shellescape(realfilepath)
+      silent exe '$read '.s:expandReadarg('!cd %:h >/dev/null && hg --config defaults.log= log --rev "ancestors(parents())" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}|+{parents}|{desc|firstline}\n" %:t', realfilepath)
     endif
     1d
     " sort by reverse date (most recent first)
