@@ -193,7 +193,7 @@ noremap <silent> <unique> <Plug>DeltaVimCloseMergeIncoming :call <SID>closeMerge
 
 " Whenever any buffer window goes away, if there are no more diff windows
 " remaining, then turn off diff mode in the principal buffer.
-autocmd BufHidden * call s:cleanUp()
+autocmd BufHidden * call s:cleanUp("global BufHidden *")
 
 " Whenever a buffer is written, refresh all the diff windows
 autocmd BufWritePost * call s:refreshWorkingCopyDiff()
@@ -246,7 +246,13 @@ endfunc
 
 " After any buffer is hidden, check if any diff buffers are still visible.  If
 " not, then turn off diff mode, restore wrap mode, and clean up variables.
-func s:cleanUp()
+func s:cleanUp(desc)
+  "echo 'cleanUp("'.a:desc.'"): bufnr("%") = ' . bufnr('%')
+  "echo 'exists("t:origDiffBuffer") = ' . exists('t:origDiffBuffer')
+  "if exists('t:origDiffBuffer')
+  "  echo 't:origDiffBuffer = ' . t:origDiffBuffer
+  "  echo 'bufwinnr(t:origDiffBuffer) = ' . bufwinnr(t:origDiffBuffer)
+  "endif
   if exists('t:turnOffDiff') && t:turnOffDiff == bufnr('%')
     " This is a kludge, to work around a bug that the :diffoff! below does not turn
     " off diff mode in the buffer that is being left.
@@ -254,8 +260,8 @@ func s:cleanUp()
     unlet t:turnOffDiff
     call s:restoreWrapMode()
   endif
+  "echo 's:countDiffs() == ' . s:countDiffs() . '  s:testLogExists() == ' . s:testLogExists()
   if s:countDiffs() == 0
-    "echo 'exists("t:origDiffBuffer") = ' . exists('t:origDiffBuffer') . ', bufnr("%") = ' . bufnr('%')
     diffoff!
     call s:restoreWrapMode()
     set noequalalways
@@ -263,12 +269,14 @@ func s:cleanUp()
       let t:turnOffDiff = t:origDiffBuffer
       if !s:testLogExists()
         unlet! t:origDiffBuffer
+        "echo 'unlet! t:origDiffBuffer (A)'
       endif
     endif
   endif
   if !s:testLogExists()
     unlet! t:hgLogBuffer
   endif
+  "echo 'WAH'
 endfunc
 
 func s:openRevisionDiff(rev)
@@ -606,8 +614,8 @@ func s:openDiff(diffname, readArg, rev, annotation, label)
       " substitute all '%' in the read argument with the real path of this file buffer
       " substitute all '%:h' in the read argument with the real diirectory of this file buffer
       " escape shell metacharacters if the read argument is a shell command (starts with '!')
-      let realfiledir = resolve(filedir)
       let realfilename = resolve(filename)
+      let realfiledir = fnamemodify(filename, ":h")
       let readarg = a:readArg
       if readarg[0] == '!'
         let realfiledir = shellescape(realfiledir)
@@ -643,6 +651,7 @@ func s:openDiff(diffname, readArg, rev, annotation, label)
         exe 'unlet' varname
         if s:countDiffs() == 0
           unlet t:origDiffBuffer
+          "echo 'unlet! t:origDiffBuffer (C)'
         endif
         wincmd c
         call s:restoreWrapMode()
@@ -655,8 +664,10 @@ func s:openDiff(diffname, readArg, rev, annotation, label)
       setlocal scrollbind
       diffthis
       augroup DeltaVim_Hg
+        " When the source file's buffer ceases to be visible in any window,
+        " close all associated buffers, including the diff buffer.
         autocmd BufWinLeave <buffer> nested call s:closeAll()
-        autocmd BufWinEnter <buffer> call s:cleanUp()
+        "autocmd BufWinEnter <buffer> call s:cleanUp("BufWinEnter ".expand('<abuf>').' (diff)')
       augroup END
       diffupdate
     endif
@@ -713,7 +724,7 @@ endfunc
 func s:cleanUpDiff(diffname)
   let varname = 't:'.a:diffname.'DiffBuffer'
   exe 'unlet!' varname
-  call s:cleanUp()
+  call s:cleanUp('cleanUpDiff("'.a:diffname.'")')
 endfunc
 
 func s:countDiffs()
@@ -760,6 +771,11 @@ func s:openLog()
     let filedir = expand('%:h')
     " save the current wrap modes to restore them later
     call s:recordWrapMode()
+    augroup DeltaVim_Hg
+      " When the source file's buffer ceases to be visible in any window, close
+      " all associated buffers, including the log buffer.
+      autocmd BufWinLeave <buffer> nested call s:closeAll()
+    augroup END
     " open the log navigation window
     botright 10 new
     let t:hgLogBuffer = bufnr('%')
@@ -813,7 +829,7 @@ func s:openLog()
     nnoremap <buffer> <silent> q :call <SID>closeLog()<CR>
     " housekeeping for buffer close
     augroup DeltaVim_Hg
-      autocmd BufDelete <buffer> call s:cleanUp()
+      autocmd BufDelete <buffer> call s:cleanUpLog()
     augroup END
   endif
 endfunc
@@ -848,6 +864,12 @@ func s:mergeFlag(hgParents)
   return 'M'
 endfunc
 
+" Called when the log buffer is about to be deleted.
+func s:cleanUpLog()
+  unlet! t:hgLogBuffer
+  call s:cleanUp('cleanUpLog()')
+endfunc
+
 " Return 1 if the log buffer exists.
 func s:testLogExists()
   return exists('t:hgLogBuffer') && buflisted(t:hgLogBuffer)
@@ -868,7 +890,6 @@ func s:closeLog()
     " delete the buffer and let the BufDelete autocmd do the clean-up
     exe t:hgLogBuffer 'bdelete'
   endif
-  unlet! t:hgLogBuffer
 endfunc
 
 func s:openLogRevisionDiffs(visual)
