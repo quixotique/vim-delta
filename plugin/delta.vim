@@ -670,11 +670,9 @@ endfunc
 "  - substitute all '%' with the 'percent' path
 "  - substitute all '%:h' with the head of the 'percent' path
 "  - substitute all '%:t' with the tail of the 'percent' path
-"  - escape shell metacharacters in all substituted values if the argument is a
-"    shell command (starts with '!')
+"  - escape shell metacharacters in a substituted value by appending ':S' to any of the above
 func s:expandReadarg(text, percent)
-  let escapefn = a:text[0] == '!' ? 'shellescape' : 's:ident'
-  return substitute(a:text, '%\(:[ht~.]\|\)', '\='.escapefn.'(fnamemodify(a:percent, submatch(1)))', "g")
+  return substitute(a:text, '%\(\%(:[Sht~.]\)*\)', '\=fnamemodify(a:percent, submatch(1))', "g")
 endfunc
 
 " Put the focus in the original diff file window and return 1 if it exists.
@@ -789,11 +787,11 @@ func s:openLog()
     " read the mercurial log into it -- all ancestors of the current working revision
     if s:isWorkingMerge()
       " if currently merging, show '1' and '2' flags to indicate which revisions contributed to each parent
-      silent exe '$read '.s:expandReadarg('!cd %:h >/dev/null && hg --config defaults.log= log --rev "ancestors(p1())-ancestors(ancestor(p1(),p2()))" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}|1 +{parents}|{desc|firstline}\n" %:t', realfilepath)
-      silent exe '$read '.s:expandReadarg('!cd %:h >/dev/null && hg --config defaults.log= log --rev "ancestors(p2())-ancestors(ancestor(p1(),p2()))" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}| 2+{parents}|{desc|firstline}\n" %:t', realfilepath)
-      silent exe '$read '.s:expandReadarg('!cd %:h >/dev/null && hg --config defaults.log= log --rev "ancestors(ancestor(p1(),p2()))" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}|12+{parents}|{desc|firstline}\n" %:t', realfilepath)
+      silent exe '$read !'.s:expandReadarg('cd %:h:S >/dev/null && hg --config defaults.log= log --rev "ancestors(p1())-ancestors(ancestor(p1(),p2()))" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}|1 +{parents}|{desc|firstline}\n" %:t:S', realfilepath)
+      silent exe '$read !'.s:expandReadarg('cd %:h:S >/dev/null && hg --config defaults.log= log --rev "ancestors(p2())-ancestors(ancestor(p1(),p2()))" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}| 2+{parents}|{desc|firstline}\n" %:t:S', realfilepath)
+      silent exe '$read !'.s:expandReadarg('cd %:h:S >/dev/null && hg --config defaults.log= log --rev "ancestors(ancestor(p1(),p2()))" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}|12+{parents}|{desc|firstline}\n" %:t:S', realfilepath)
     else
-      silent exe '$read '.s:expandReadarg('!cd %:h >/dev/null && hg --config defaults.log= log --rev "ancestors(parents())" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}|+{parents}|{desc|firstline}\n" %:t', realfilepath)
+      silent exe '$read !'.s:expandReadarg('cd %:h:S >/dev/null && hg --config defaults.log= log --rev "ancestors(parents())" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}|+{parents}|{desc|firstline}\n" %:t:S', realfilepath)
     endif
     1d
     " sort by reverse date (most recent first)
