@@ -662,7 +662,9 @@ func s:openDiff(diffname, readArg, rev, annotation, label)
   endif
 endfunc
 
-func s:ident(text)
+" Helpful for debugging
+func s:echo(prefix, text)
+  echo a:prefix.a:text
   return a:text
 endfunc
 
@@ -672,7 +674,10 @@ endfunc
 "  - substitute all '%:t' with the tail of the 'percent' path
 "  - escape shell metacharacters in a substituted value by appending ':S' to any of the above
 func s:expandReadarg(text, percent)
-  return substitute(a:text, '%\(\%(:[Sht~.]\)*\)', '\=fnamemodify(a:percent, submatch(1))', "g")
+  " In Vim 7.4, a bug in fnamemodify() fails when the modifiers are ':h:S' and
+  " the path ends in '.h'.  We work around it by invoking fnamemodify() twice,
+  " once for the ':h' and once for the ':S'
+  return substitute(a:text, '%\(\%(:[ht~.]\)\?\)\(\%(:S\)\?\)', '\=fnamemodify(fnamemodify(a:percent, submatch(1)), submatch(2))', "g")
 endfunc
 
 " Put the focus in the original diff file window and return 1 if it exists.
@@ -797,15 +802,15 @@ func s:openLog()
     " sort by reverse date (most recent first)
     sort! /^\([^|]*|\)\{2\}/
     " justify the first column (rev number)
-    silent %s@^\d\+@\=submatch(0).repeat(' ', 6-len(submatch(0)))@
+    silent %s@^\d\+@\=submatch(0).repeat(' ', 6-len(submatch(0)))@e
     " clean up the date column
-    silent %s@^\(\%([^|]*|\)\{2\}\)\([^|]*\) +\d\d\d\d|@\1\2|@
+    silent %s@^\(\%([^|]*|\)\{2\}\)\([^|]*\) +\d\d\d\d|@\1\2|@e
     " justify/truncate the username column
-    silent %s@^\(\%([^|]*|\)\{3\}\)\([^|]*\)@\=submatch(1).strpart(submatch(2),0,10).repeat(' ', 10-len(submatch(2)))@
+    silent %s@^\(\%([^|]*|\)\{3\}\)\([^|]*\)@\=submatch(1).strpart(submatch(2),0,10).repeat(' ', 10-len(submatch(2)))@e
     " justify/truncate the branch column
-    silent %s@^\(\%([^|]*|\)\{4\}\)\([^|]*\)@\=submatch(1).strpart(submatch(2),0,30).repeat(' ', 30-len(submatch(2)))@
+    silent %s@^\(\%([^|]*|\)\{4\}\)\([^|]*\)@\=submatch(1).strpart(submatch(2),0,30).repeat(' ', 30-len(submatch(2)))@e
     " condense the parents column into "M" flag
-    silent %s@^\(\%([^|]*|\)\{5\}\)\([^+]*+\)\([^|]*\)@\=submatch(1).submatch(2)[:-2].call('s:mergeFlag', [submatch(3)])@
+    silent %s@^\(\%([^|]*|\)\{5\}\)\([^+]*+\)\([^|]*\)@\=submatch(1).submatch(2)[:-2].call('s:mergeFlag', [submatch(3)])@e
     " go the first line (most recent revision)
     1
     " set the buffer properties
