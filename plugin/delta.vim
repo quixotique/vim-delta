@@ -11,14 +11,24 @@
 " ------------------------------------------------------------------------------
 " Exit if this app has already been loaded or in vi compatible mode.
 "
-if exists("g:loaded_DeltaVim_Hg") || &cp
+if exists("g:loaded_DeltaVim") || &cp
   finish
 endif
-let g:loaded_DeltaVim_Hg = 1
+let g:loaded_DeltaVim = 1
 
 " Standard Vim plugin boilerplate.
 let s:keepcpo = &cpo
 set cpo&vim
+
+" Settings that can be overridden by the user.
+if !exists('*DeltaVim_isReleaseTag')
+  func DeltaVim_isReleaseTag(tagname)
+    " Any tag with a name that looks like a version number, eg, 1.4, 0.92.7
+    " is probably a release.  Also, any tag beginning with the prefix
+    " 'release' (case insensitive).
+    return a:tagname =~ '\(^\d\+\(\.\d\+\)*$\|^\crelease\)'
+  endfunc
+endif
 
 " Save the <Leader> char as it was when the mappings were defined, so the help
 " message can quote the correct key sequences even if mapleader gets changed.
@@ -40,9 +50,9 @@ func s:help()
   echomsg m.'T                   Close the diff window opened with '.m.'t'
   echomsg m.'o   Branch origin   Open a new diff window on current branch origin (Hg only; earliest revision on current named branch)'
   echomsg m.'O                   Close the diff window opened with '.m.'b'
-  echomsg m.'r   Release         Open a new diff window on latest release (Hg only; latest tag starting with "release")'
+  echomsg m.'r   Release         Open a new diff window on latest release (tag with "release" prefix or version number)'
   echomsg m.'R                   Close the diff window opened with '.m.'n'
-  echomsg m.'p   Prior release   Open a new diff window on prior release (Hg only; penultimate tag starting with "release")'
+  echomsg m.'p   Prior release   Open a new diff window on prior release (tag with "release" prefix or version number)'
   echomsg m.'P                   Close the diff window opened with '.m.'n'
 " echomsg m.'i   Incoming        Open a new diff window on the revision most recently merged into the current branch'
 " echomsg m.'I                   Close the diff window opened with '.m.'m'
@@ -201,7 +211,7 @@ autocmd BufWritePost * call s:refreshWorkingCopyDiff()
 " ------------------------------------------------------------------------------
 " APPLICATION FUNCTIONS
 
-let s:allDiffNames = ['working', 'ancestor', 'parent1', 'parent2', 'branchOrigin', 'trunk', 'newestRelease', 'priorRelease', 'revision1', 'revision2']
+let s:allDiffNames = ['working', 'ancestor', 'head', 'parent1', 'parent2', 'branchOrigin', 'trunk', 'newestRelease', 'priorRelease', 'revision1', 'revision2']
 
 " Close all diff windows and the log window.  This operation should leave no
 " windows visible that were created by any mappings or functions in this plugin.
@@ -274,7 +284,7 @@ func s:cleanUp(desc)
     endif
   endif
   if !s:testLogExists()
-    unlet! t:hgLogBuffer
+    unlet! t:logBuffer
   endif
   "echo 'WAH'
 endfunc
@@ -282,7 +292,11 @@ endfunc
 func s:openRevisionDiff(rev)
   if a:rev != ''
     try
-      call s:openHgDiff('revision1', a:rev, a:rev)
+      if s:isGit()
+        call s:openGitDiff('revision1', a:rev, a:rev)
+      elseif s:isHg()
+        call s:openHgDiff('revision1', a:rev, a:rev)
+      endif
     endtry
   endif
 endfunc
@@ -303,11 +317,16 @@ endfunc
 
 func s:openHeadDiff()
   try
-    call s:openHgDiff('parent1', '.', '')
+    if s:isGit()
+      call s:openGitDiff('head', 'HEAD', '')
+    elseif s:isHg()
+      call s:openHgDiff('parent1', '.', '')
+    endif
   endtry
 endfunc
 
 func s:closeHeadDiff()
+  call s:closeDiff('head')
   call s:closeDiff('parent1')
 endfunc
 
@@ -403,7 +422,7 @@ func s:closeTrunkDiff()
 endfunc
 
 func s:openNewestReleaseDiff()
-  let rev = s:newestHgReleaseRev()
+  let rev = s:newestReleaseTag()
   if rev != ''
     try
       call s:openHgDiff('newestRelease', rev, rev)
@@ -416,7 +435,7 @@ func s:closeNewestReleaseDiff()
 endfunc
 
 func s:openPriorReleaseDiff()
-  let rev = s:priorHgReleaseRev()
+  let rev = s:priorReleaseTag()
   if rev != ''
     try
       call s:openHgDiff('priorRelease', rev, rev)
@@ -431,19 +450,14 @@ endfunc
 " ------------------------------------------------------------------------------
 " PRIVATE FUNCTIONS
 
-" If the given Mercurial output lines contain any error message, or the command
-" itself returned an error exit status, then display an error message and quote
-" any error message from Mercurial, then return 1 to indicate an error
-" condition.  Otherwise return 0.
-func s:displayHgError(message, lines)
-  let errorlines = filter(copy(a:lines), 'v:val =~ "^\\*\\*\\*"')
-  if v:shell_error || len(errorlines)
+func s:displayError(message, lines)
+  if v:shell_error || len(a:lines)
     echohl ErrorMsg
     echomsg a:message
     echohl None
-    if len(errorlines)
+    if len(a:lines)
       echohl WarningMsg
-      echomsg join(errorlines, "\n")
+      echomsg join(a:lines, "\n")
       echohl None
     endif
     return 1
@@ -451,130 +465,48 @@ func s:displayHgError(message, lines)
   return 0
 endfunc
 
-" Return a list of the names of all Mercurial release tags in the current
-" file's repository, in lexical sorted order.
-func s:allHgReleaseTags()
-  let dir = s:getHgCwd()
-  let lines = split(system('cd '.shellescape(dir).' >/dev/null && hg --config defaults.tags= tags | awk ''$1~/^release_[0-9]+_finished$/{print $1}'''), "\n")
-  if s:displayHgError('Could not get list of tags', lines)
-    return []
+" Return the current working directory in which Mercurial commands relating to
+" the current buffer's file should be executed.  In diff and log windows, we
+" use the buffer's 'fileDir' variable, if set, otherwise we use the directory
+" of the file being edited.
+func s:getFileWorkingDirectory()
+  if exists('b:fileDir')
+    return b:fileDir
+  else
+    return expand('%:h')
+  endif
+endfunc
+
+" Return a list of the names of all tags in the current file's repository, in
+" lexical sorted order.
+func s:allTagsSorted()
+  let dir = s:getFileWorkingDirectory()
+  if s:isGit(dir)
+    let lines = s:allGitTags(dir)
+  elseif s:isHg(dir)
+    let lines = s:allHgTags(dir)
+  else
+    call s:notRepository(dir)
+    let lines = []
   endif
   return sort(lines)
 endfunc
 
-" Extract a release date from a release name in the form "release-DATE", or
-" return the whole name if not of this form.
-func s:extractReleaseDate(name)
-  if strpart(a:name, 0, 8) == 'release-'
-    return strpart(a:name, 8)
-  endif
-  return a:name
+" Return a list of the names of all release tags in the current file's
+" repository, in lexical sorted order.
+func s:allReleaseTagsSorted()
+  let tags = s:allTagsSorted()
+  return filter(tags, 'DeltaVim_isReleaseTag(v:val)')
 endfunc
 
-" Return the latest Mercurial release name, or '' if there are no release
-" branches.
-func s:newestHgReleaseRev()
-  return get(s:allHgReleaseTags(), -1, '')
+" Return the latest release tag, or '' if there are no releases.
+func s:newestReleaseTag()
+  return get(s:allReleaseTagsSorted(), -1, '')
 endfunc
 
-" Return the penultimate Mercurial release name, or '' if there are fewer than
-" two release branches.
-func s:priorHgReleaseRev()
-  return get(s:allHgReleaseTags(), -2, '')
-endfunc
-
-" Return a list of Mercurial revision IDs (nodes) determined by the given
-" hg log options, in reverse chronological order (most recent first).
-func s:getHgRevisions(hgLogOpts)
-  let dir = s:getHgCwd()
-  let lines = split(system('cd '.shellescape(dir).' >/dev/null  && hg --config defaults.log= log --template "{node}\n" '.a:hgLogOpts), "\n")
-  if s:displayHgError('Could not get revisions from "hg log '.a:hgLogOpts.'"', lines)
-    return []
-  endif
-  return lines
-endfunc
-
-" Return much information about a specific revision.
-func s:getHgRevisionInfo(rev)
-  let info = {}
-  let dir = s:getHgCwd()
-  let lines = split(system('cd '.shellescape(dir).' >/dev/null && hg --config defaults.log= log --template "{rev}\n{node}\n{node|short}\n{branches}\n{parents}\n{tags}\n{author}\n{author|user}\n{date|date}\n{date|isodate}\n{date|shortdate}\nDESCRIPTION\n{desc}\n" --rev '.shellescape(a:rev)), "\n")
-  if !s:displayHgError('Could not get information for revision "'.a:rev.'"', lines)
-    if len(lines) == 0
-      echohl ErrorMsg
-      echomsg 'Revision "'.a:rev.'" does not exist'
-      echohl None
-    elseif len(lines) < 13 || lines[11] != 'DESCRIPTION'
-      echohl ErrorMsg
-      echomsg 'Malformed output from "hg log":'
-      echohl None
-      for line in lines
-        echomsg line
-      endfor
-    else
-      let info.rev = remove(lines, 0)
-      let info.node = remove(lines, 0)
-      let info.shortnode = remove(lines, 0)
-      let info.branch = remove(lines, 0)
-      if info.branch == ''
-        let info.branch = 'default'
-      endif
-      let parents = remove(lines, 0)
-      let info.parents = map(split(parents), 'split(v:val,":")[1]')
-      let info.parentrevs = map(split(parents), 'split(v:val,":")[0]')
-      let info.tags = split(remove(lines, 0))
-      let info.author = remove(lines, 0)
-      let info.user = remove(lines, 0)
-      let info.date = remove(lines, 0)
-      let info.isodate = remove(lines, 0)
-      let info.shortdate = remove(lines, 0)
-      call remove(lines, 0)
-      let info.summary = lines[0]
-      let info.description = join(lines, "\n")
-    endif
-  endif
-  return info
-endfunc
-
-"" Return the current Mercurial branch's most recently merged trunk (default
-"" branch) revision.  Ie, the revision of the trunk that was merged in, not the
-"" resulting revision in the current branch.
-"func s:latestHgDefaultMergeRevision()
-"  let merges = s:getHgRevisions('--branch . --only-merges')
-"  for rev in merges
-"    let info = s:getHgRevisionInfo(rev)
-"    if !len(info)
-"      return ''
-"    endif
-"    if info.branch != 'default'
-"      for parentrev in info.parentrevs
-"        let parentinfo = s:getHgRevisionInfo(parentrev)
-"        if !len(parentinfo)
-"          return ''
-"        endif
-"        if parentinfo.branch == 'default'
-"          return parentinfo.node
-"        endif
-"      endfor
-"    endif
-"  endfor
-"  return ''
-"endfunc
-
-" Open a new diff window containing the given Mercurial revision.
-"
-" Param: diffname The symbolic name of the new diff buffer
-" Param: rev The Mercurial revision to fetch
-" Param: label If set, replaces diffName as the displayed label
-"
-func s:openHgDiff(diffname, rev, label)
-  let info = s:getHgRevisionInfo(a:rev)
-  if len(info)
-    let annotation = info.shortnode.' '.info.shortdate
-    try
-      call s:openDiff(a:diffname, '!cd %:h >/dev/null && hg --config defaults.cat= cat -r '.info.rev.' %:t', info.rev, annotation, a:label)
-    endtry
-  endif
+" Return the penultimate release tag, or '' if there are fewer than two release tags.
+func s:priorReleaseTag()
+  return get(s:allReleaseTagsSorted(), -2, '')
 endfunc
 
 " Open a new diff window containing the contents of the given file, which is
@@ -645,13 +577,13 @@ func s:openDiff(diffname, readArg, rev, annotation, label)
         call s:restoreWrapMode()
         echoerr substitute(v:exception, '^Vim(\a\+):', '', '')
       endtry
-      augroup DeltaVim_Hg
+      augroup DeltaVim
         exe 'autocmd BufDelete <buffer> call s:cleanUpDiff('.string(a:diffname).')'
       augroup END
       wincmd x
       setlocal scrollbind
       diffthis
-      augroup DeltaVim_Hg
+      augroup DeltaVim
         " When the source file's buffer ceases to be visible in any window,
         " close all associated buffers, including the diff buffer.
         autocmd BufWinLeave <buffer> nested call s:closeAll()
@@ -673,11 +605,14 @@ endfunc
 "  - substitute all '%:h' with the head of the 'percent' path
 "  - substitute all '%:t' with the tail of the 'percent' path
 "  - escape shell metacharacters in a substituted value by appending ':S' to any of the above
+"  - substitute '%%' with '%'
 func s:expandReadarg(text, percent)
   " In Vim 7.4, a bug in fnamemodify() fails when the modifiers are ':h:S' and
   " the path ends in '.h'.  We work around it by invoking fnamemodify() twice,
   " once for the ':h' and once for the ':S'
-  return substitute(a:text, '%\(\%(:[ht~.]\)\?\)\(\%(:S\)\?\)', '\=fnamemodify(fnamemodify(a:percent, submatch(1)), submatch(2))', "g")
+  let expanded = substitute(a:text, '%\(%\|\(\%(:[ht~.]\)\?\)\(\%(:S\)\?\)\)', '\=submatch(1) == "%" ? "%" : fnamemodify(fnamemodify(a:percent, submatch(2)), submatch(3))', "g")
+  echo "expanded=".expanded
+  return expanded
 endfunc
 
 " Put the focus in the original diff file window and return 1 if it exists.
@@ -748,19 +683,8 @@ func s:countDiffs()
   return n
 endfunc
 
-" Return the current working directory in which hg commands relating to the
-" current buffer's file should be executed.
-func s:getHgCwd()
-  if exists('b:fileDir')
-    return b:fileDir
-  else
-    return expand('%:h')
-  endif
-endfunc
-
-" ------------------------------------------------------------------------------
-" Mercurial log navigation.
-
+" Open a new window containing the log history of the current file.
+"
 func s:openLog()
   " close the log window if it already exists
   call s:closeLog()
@@ -778,39 +702,74 @@ func s:openLog()
     let realfiledir = fnamemodify(realfilepath, ':h')
     " save the current wrap modes to restore them later
     call s:recordWrapMode()
-    augroup DeltaVim_Hg
+    augroup DeltaVim
       " When the source file's buffer ceases to be visible in any window, close
       " all associated buffers, including the log buffer.
       autocmd BufWinLeave <buffer> nested call s:closeAll()
     augroup END
     " create the log navigation window
     botright 10 new
-    let t:hgLogBuffer = bufnr('%')
+    let t:logBuffer = bufnr('%')
     let b:fileDir = realfiledir
     " give the buffer a helpful name
     silent exe 'file' fnameescape('log '.filepath)
-    " read the mercurial log into it -- all ancestors of the current working revision
-    if s:isWorkingMerge()
-      " if currently merging, show '1' and '2' flags to indicate which revisions contributed to each parent
-      silent exe '$read !'.s:expandReadarg('cd %:h:S >/dev/null && hg --config defaults.log= log --rev "ancestors(p1())-ancestors(ancestor(p1(),p2()))" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}|1 +{parents}|{desc|firstline}\n" %:t:S', realfilepath)
-      silent exe '$read !'.s:expandReadarg('cd %:h:S >/dev/null && hg --config defaults.log= log --rev "ancestors(p2())-ancestors(ancestor(p1(),p2()))" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}| 2+{parents}|{desc|firstline}\n" %:t:S', realfilepath)
-      silent exe '$read !'.s:expandReadarg('cd %:h:S >/dev/null && hg --config defaults.log= log --rev "ancestors(ancestor(p1(),p2()))" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}|12+{parents}|{desc|firstline}\n" %:t:S', realfilepath)
+    if s:isGit(realfiledir)
+      " read the Git log into it -- all ancestors of the current working revision
+      let heads = "HEAD"
+      if s:isGitWorkingMerge(realfiledir)
+        let heads = "HEAD MERGE_HEAD"
+      endif
+      "silent
+      echo "Git!!"
+      exe '$read !'.s:expandReadarg("cd %:h:S >/dev/null && git log --graph --date-order --format='format:\\%%h|\\%%ai|\\%%an|\\%%s' ".heads." -- %:t:S", realfilepath)
+      if s:displayGitError('Cannot read Git log', getline(1,'$'))
+        call s:closeLog()
+        return
+      endif
+      setlocal filetype=gitlogcompact
+      1d
+      " justify the first column (graph number)
+      let w = max([4, max(map(getline(1,'$'), "len(substitute(v:val, '\\x.*$', '', ''))"))])
+      silent g/\x\{6,\}|/s/^\X*/\=submatch(0).repeat(' ', w-len(submatch(0)))/
+      " remove seconds from the date column
+      silent g/^\(\X*\x\{6,\}|\)\(\d\d\d\d-\d\d-\d\d \d\d:\d\d\):\d\d/s//\1\2/
+      " remove timezone from the date column
+      "silent g/^\(\%([^|]*|\)\{1\}\)\([^|]*\) +\d\d\d\d|/s//\1\2|/
+      " justify/truncate the username column
+      silent g/^\(\X*\x\{6,\}|[^|]*|\)\([^|]*\)/s//\=submatch(1).strpart(submatch(2),0,16).repeat(' ', 16-len(submatch(2)))/
+    elseif s:isHg(realfiledir)
+      " read the mercurial log into it -- all ancestors of the current working revision
+      if s:isHgWorkingMerge(realfiledir)
+        " if currently merging, show '1' and '2' flags to indicate which revisions contributed to each parent
+        silent exe '$read !'.s:expandReadarg('cd %:h:S >/dev/null && hg --config defaults.log= log --rev "ancestors(p1())-ancestors(ancestor(p1(),p2()))" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}|1 +{parents}|{desc|firstline}\n" %:t:S', realfilepath)
+        silent exe '$read !'.s:expandReadarg('cd %:h:S >/dev/null && hg --config defaults.log= log --rev "ancestors(p2())-ancestors(ancestor(p1(),p2()))" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}| 2+{parents}|{desc|firstline}\n" %:t:S', realfilepath)
+        silent exe '$read !'.s:expandReadarg('cd %:h:S >/dev/null && hg --config defaults.log= log --rev "ancestors(ancestor(p1(),p2()))" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}|12+{parents}|{desc|firstline}\n" %:t:S', realfilepath)
+      else
+        silent exe '$read !'.s:expandReadarg('cd %:h:S >/dev/null && hg --config defaults.log= log --rev "ancestors(parents())" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}|+{parents}|{desc|firstline}\n" %:t:S', realfilepath)
+      endif
+      if s:displayHgError('Cannot read Mercurial log', getline(1,'$'))
+        call s:closeLog()
+        return
+      endif
+      setlocal filetype=hglogcompact
+      1d
+      " sort by reverse date (most recent first)
+      sort! /^\([^|]*|\)\{2\}/
+      " justify the first column (rev number)
+      silent %s@^\d\+@\=submatch(0).repeat(' ', 6-len(submatch(0)))@e
+      " clean up the date column
+      silent %s@^\(\%([^|]*|\)\{2\}\)\([^|]*\) +\d\d\d\d|@\1\2|@e
+      " justify/truncate the username column
+      silent %s@^\(\%([^|]*|\)\{3\}\)\([^|]*\)@\=submatch(1).strpart(submatch(2),0,10).repeat(' ', 10-len(submatch(2)))@e
+      " justify/truncate the branch column
+      silent %s@^\(\%([^|]*|\)\{4\}\)\([^|]*\)@\=submatch(1).strpart(submatch(2),0,30).repeat(' ', 30-len(submatch(2)))@e
+      " condense the parents column into "M" flag
+      silent %s@^\(\%([^|]*|\)\{5\}\)\([^+]*+\)\([^|]*\)@\=submatch(1).submatch(2)[:-2].call('s:hgMergeFlag', [submatch(3)])@e
     else
-      silent exe '$read !'.s:expandReadarg('cd %:h:S >/dev/null && hg --config defaults.log= log --rev "ancestors(parents())" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}|+{parents}|{desc|firstline}\n" %:t:S', realfilepath)
+      call s:displayError("Not a Git or Mercurial repository: ".realfilepath)
+      call s:closeLog()
+      return
     endif
-    1d
-    " sort by reverse date (most recent first)
-    sort! /^\([^|]*|\)\{2\}/
-    " justify the first column (rev number)
-    silent %s@^\d\+@\=submatch(0).repeat(' ', 6-len(submatch(0)))@e
-    " clean up the date column
-    silent %s@^\(\%([^|]*|\)\{2\}\)\([^|]*\) +\d\d\d\d|@\1\2|@e
-    " justify/truncate the username column
-    silent %s@^\(\%([^|]*|\)\{3\}\)\([^|]*\)@\=submatch(1).strpart(submatch(2),0,10).repeat(' ', 10-len(submatch(2)))@e
-    " justify/truncate the branch column
-    silent %s@^\(\%([^|]*|\)\{4\}\)\([^|]*\)@\=submatch(1).strpart(submatch(2),0,30).repeat(' ', 30-len(submatch(2)))@e
-    " condense the parents column into "M" flag
-    silent %s@^\(\%([^|]*|\)\{5\}\)\([^+]*+\)\([^|]*\)@\=submatch(1).submatch(2)[:-2].call('s:mergeFlag', [submatch(3)])@e
     " go the first line (most recent revision)
     1
     " set the buffer properties
@@ -819,7 +778,6 @@ func s:openLog()
     setlocal nomodifiable
     setlocal noswapfile
     setlocal bufhidden=delete
-    setlocal filetype=hglogcompact
     set syntax=hglogcompact
     setlocal winfixheight
     " Set up some useful key mappings.
@@ -834,58 +792,28 @@ func s:openLog()
     nnoremap <buffer> <silent> m :call <SID>gotoOrigWindow()<CR>
     nnoremap <buffer> <silent> q :call <SID>closeLog()<CR>
     " housekeeping for buffer close
-    augroup DeltaVim_Hg
+    augroup DeltaVim
       autocmd BufDelete <buffer> call s:cleanUpLog()
     augroup END
   endif
 endfunc
 
-" Return 1 if the current working directory is a merge (has two parents).
-func s:isWorkingMerge()
-  let dir = s:getHgCwd()
-  let nparents = system('cd '.shellescape(dir).' >/dev/null && hg --config defaults.parents= parents --template "x\n" | wc --lines')
-  if v:shell_error
-    echohl ErrorMsg
-    echomsg 'Could not count Mercurial parents of working directory'
-    echohl None
-    return 0
-  endif
-  if str2nr(nparents) == 2
-    return 1
-  endif
-  return 0
-endfunc
-
-" Convert a list of parent revisions into a single character: "M" if there are
-" two (or more) parents, " " otherwise.
-func s:mergeFlag(hgParents)
-  let i = stridx(a:hgParents, ':')
-  if i == -1
-    return ' '
-  endif
-  let j = strridx(a:hgParents, ':')
-  if i == j
-    return ' '
-  endif
-  return 'M'
-endfunc
-
 " Called when the log buffer is about to be deleted.
 func s:cleanUpLog()
-  unlet! t:hgLogBuffer
+  unlet! t:logBuffer
   call s:cleanUp('cleanUpLog()')
 endfunc
 
 " Return 1 if the log buffer exists.
 func s:testLogExists()
-  return exists('t:hgLogBuffer') && buflisted(t:hgLogBuffer)
+  return exists('t:logBuffer') && buflisted(t:logBuffer)
 endfunc
 
 " Put the focus in the log buffer window and return 1 if it exists.  Otherwise
 " return 0.
 func s:gotoLogWindow()
-  if exists('t:hgLogBuffer')
-    exe bufwinnr(t:hgLogBuffer) 'wincmd w'
+  if exists('t:logBuffer')
+    exe bufwinnr(t:logBuffer) 'wincmd w'
     return 1
   endif
   return 0
@@ -894,7 +822,7 @@ endfunc
 func s:closeLog()
   if s:testLogExists()
     " delete the buffer and let the BufDelete autocmd do the clean-up
-    exe t:hgLogBuffer 'bdelete'
+    exe t:logBuffer 'bdelete'
   endif
 endfunc
 
@@ -923,7 +851,11 @@ func s:openLogRevisionDiff(n, rev)
   let bufname = 'revision'.a:n
   if a:rev != '' && exists('t:origDiffBuffer')
     try
-      call s:openHgDiff(bufname, a:rev, a:rev)
+      if s:isGit()
+        call s:openGitDiff(bufname, a:rev, a:rev)
+      elseif s:isHg()
+        call s:openHgDiff(bufname, a:rev, a:rev)
+      endif
     finally
       " return the focus to the log window
       if s:gotoLogWindow()
@@ -995,6 +927,262 @@ func s:setBufferWrapMode(...)
   if exists('b:wrapMode')
     let &l:wrap = b:wrapMode
   endif
+endfunc
+
+" ------------------------------------------------------------------------------
+" PRIVATE FUNCTIONS - Git
+
+func s:isGit(...)
+  let dir = a:0 ? fnamemodify(a:1, ':p:h') : s:getFileWorkingDirectory()
+  return findfile('.git/config', dir.';') != ''
+endfunc
+
+" If the given Git output lines contain any error message, or the command
+" itself returned an error exit status, then display an error message and quote
+" any error message from Git, then return 1 to indicate an error
+" condition.  Otherwise return 0.
+func s:displayGitError(message, lines)
+  return s:displayError(a:message, filter(copy(a:lines), 'v:val =~ "^fatal:"'))
+endfunc
+
+" Return much information about a specific Git commit.
+func s:getGitRevisionInfo(refspec)
+  let info = {}
+  let lines = split(system('cd '.shellescape(expand('%:h')).' >/dev/null && git log -1 --format="%h%n%H%n%ai%n%an%n%ae%nSUMMARY%n%s%nBODY%n%b" '.shellescape(a:refspec)), "\n")
+  if !s:displayGitError('Could not get information for refspec "'.a:refspec.'"', lines)
+    if len(lines) == 0
+      echohl ErrorMsg
+      echomsg 'Revision "'.a:refspec.'" does not exist'
+      echohl None
+    elseif len(lines) < 7 || lines[5] != 'SUMMARY' || lines[7] != 'BODY'
+      echohl ErrorMsg
+      echomsg 'Malformed output from "git log":'
+      echohl None
+      for line in lines
+        echomsg line
+      endfor
+    else
+      let info.ahash = remove(lines, 0)
+      let info.hash = remove(lines, 0)
+      let info.date = remove(lines, 0)
+      let info.author = remove(lines, 0)
+      let info.email = remove(lines, 0)
+      call remove(lines, 0) " SUMMARY
+      let info.summary = remove(lines, 0)
+      call remove(lines, 0) " BODY
+      let info.body = join(lines, "\n")
+    endif
+  endif
+  return info
+endfunc
+
+" Return a list of the names of all tags in the current file's repository,
+" unsorted.
+func s:allGitTags(dir)
+  let lines = split(system('cd '.shellescape(a:dir).' >/dev/null && git tag --list'), "\n")
+  if s:displayGitError('Could not get list of Git tags', lines)
+    return []
+  endif
+  return lines
+endfunc
+
+" Open a new diff window containing the given Git commit.
+"
+" Param: diffname The symbolic name of the new diff buffer
+" Param: refspec The Git commit to fetch
+" Param: label If set, replaces diffName as the displayed label
+"
+func s:openGitDiff(diffname, refspec, label)
+  let ref = a:refspec.':./'.expand('%:t')
+  let lines = split(system('cd '.shellescape(expand('%:h')).' >/dev/null && git show '.shellescape(ref).' 2>&1 1>/dev/null'), "\n")
+  if !s:displayGitError('Could not show "'.ref.'"', lines)
+    if len(lines) != 0
+      echohl ErrorMsg
+      echomsg 'Errors from "git show":'
+      echohl None
+      for line in lines
+        echomsg line
+      endfor
+    else
+      let annotation = a:refspec.':'
+      let hash = ""
+      if a:refspec[0] != ':'
+        let info = s:getGitRevisionInfo(a:refspec)
+        if len(info)
+          let annotation = info.ahash.' '.info.date
+          let hash = info.hash
+        endif
+      endif
+      try
+        call s:openDiff(a:diffname, '!cd %:h >/dev/null && git show '.shellescape(ref), hash, annotation, a:label)
+      endtry
+    endif
+  endif
+endfunc
+
+" Return 1 if the current Git working directory is a merge (has any staged files).
+func s:isGitWorkingMerge(dir)
+  let nfiles = system('cd '.shellescape(a:dir)." >/dev/null && git ls-files --stage | awk 'BEGIN { nfiles = 0 } $3 != 0 { ++nfiles } END { print nfiles }'")
+  if v:shell_error
+    echohl ErrorMsg
+    echomsg 'Could not count Git staged files'
+    echohl None
+    return 0
+  endif
+  if str2nr(nfiles) != 0
+    return 1
+  endif
+  return 0
+endfunc
+
+" ------------------------------------------------------------------------------
+" PRIVATE FUNCTIONS - Mercurial
+
+func s:isHg(...)
+  let dir = a:0 ? fnamemodify(a:1, ':p:h') : s:getFileWorkingDirectory()
+  return findfile('.hg/hgrc', dir.';') != ''
+endfunc
+
+" If the given Mercurial output lines contain any error message, or the command
+" itself returned an error exit status, then display an error message and quote
+" any error message from Mercurial, then return 1 to indicate an error
+" condition.  Otherwise return 0.
+func s:displayHgError(message, lines)
+  return s:displayError(a:message, filter(copy(a:lines), 'v:val =~ "^\\*\\*\\*"'))
+endfunc
+
+" Return much information about a specific Mercurial revision.
+func s:getHgRevisionInfo(rev)
+  let info = {}
+  let dir = s:getFileWorkingDirectory()
+  let lines = split(system('cd '.shellescape(dir).' >/dev/null && hg --config defaults.log= log --template "{rev}\n{node}\n{node|short}\n{branches}\n{parents}\n{tags}\n{author}\n{author|user}\n{date|date}\n{date|isodate}\n{date|shortdate}\nDESCRIPTION\n{desc}\n" --rev '.shellescape(a:rev)), "\n")
+  if !s:displayHgError('Could not get information for revision "'.a:rev.'"', lines)
+    if len(lines) == 0
+      echohl ErrorMsg
+      echomsg 'Revision "'.a:rev.'" does not exist'
+      echohl None
+    elseif len(lines) < 13 || lines[11] != 'DESCRIPTION'
+      echohl ErrorMsg
+      echomsg 'Malformed output from "hg log":'
+      echohl None
+      for line in lines
+        echomsg line
+      endfor
+    else
+      let info.rev = remove(lines, 0)
+      let info.node = remove(lines, 0)
+      let info.shortnode = remove(lines, 0)
+      let info.branch = remove(lines, 0)
+      if info.branch == ''
+        let info.branch = 'default'
+      endif
+      let parents = remove(lines, 0)
+      let info.parents = map(split(parents), 'split(v:val,":")[1]')
+      let info.parentrevs = map(split(parents), 'split(v:val,":")[0]')
+      let info.tags = split(remove(lines, 0))
+      let info.author = remove(lines, 0)
+      let info.user = remove(lines, 0)
+      let info.date = remove(lines, 0)
+      let info.isodate = remove(lines, 0)
+      let info.shortdate = remove(lines, 0)
+      call remove(lines, 0)
+      let info.summary = lines[0]
+      let info.description = join(lines, "\n")
+    endif
+  endif
+  return info
+endfunc
+
+" Return a list of Mercurial revision IDs (nodes) determined by the given
+" hg log options, in reverse chronological order (most recent first).
+func s:getHgRevisions(hgLogOpts)
+  let dir = s:getFileWorkingDirectory()
+  let lines = split(system('cd '.shellescape(dir).' >/dev/null  && hg --config defaults.log= log --template "{node}\n" '.a:hgLogOpts), "\n")
+  if s:displayHgError('Could not get revisions from "hg log '.a:hgLogOpts.'"', lines)
+    return []
+  endif
+  return lines
+endfunc
+
+" Return a list of the names of all tags in the current file's repository,
+" unsorted.
+func s:allHgTags(dir)
+  let lines = split(system('cd '.shellescape(a:dir).' >/dev/null && hg --config defaults.tags= tags'), "\n")
+  if s:displayHgError('Could not get list of Mercurial tags', lines)
+    return []
+  endif
+  call map(lines, 'substitute("\s\+\d\+:\x{8-}$", "")')
+  return lines
+endfunc
+
+"" Return the current Mercurial branch's most recently merged trunk (default
+"" branch) revision.  Ie, the revision of the trunk that was merged in, not the
+"" resulting revision in the current branch.
+"func s:latestHgDefaultMergeRevision()
+"  let merges = s:getHgRevisions('--branch . --only-merges')
+"  for rev in merges
+"    let info = s:getHgRevisionInfo(rev)
+"    if !len(info)
+"      return ''
+"    endif
+"    if info.branch != 'default'
+"      for parentrev in info.parentrevs
+"        let parentinfo = s:getHgRevisionInfo(parentrev)
+"        if !len(parentinfo)
+"          return ''
+"        endif
+"        if parentinfo.branch == 'default'
+"          return parentinfo.node
+"        endif
+"      endfor
+"    endif
+"  endfor
+"  return ''
+"endfunc
+
+" Open a new diff window containing the given Mercurial revision.
+"
+" Param: diffname The symbolic name of the new diff buffer
+" Param: rev The Mercurial revision to fetch
+" Param: label If set, replaces diffName as the displayed label
+"
+func s:openHgDiff(diffname, rev, label)
+  let info = s:getHgRevisionInfo(a:rev)
+  if len(info)
+    let annotation = info.shortnode.' '.info.shortdate
+    try
+      call s:openDiff(a:diffname, '!cd %:h >/dev/null && hg --config defaults.cat= cat -r '.shellescape(info.rev).' %:t', info.rev, annotation, a:label)
+    endtry
+  endif
+endfunc
+
+" Return 1 if the current Mercurial working directory is a merge (has two parents).
+func s:isHgWorkingMerge(dir)
+  let nparents = system('cd '.shellescape(a:dir).' >/dev/null && hg --config defaults.parents= parents --template "x\n" | wc --lines')
+  if v:shell_error
+    echohl ErrorMsg
+    echomsg 'Could not count Mercurial parents of working directory'
+    echohl None
+    return 0
+  endif
+  if str2nr(nparents) == 2
+    return 1
+  endif
+  return 0
+endfunc
+
+" Convert a list of parent revisions into a single character: "M" if there are
+" two (or more) parents, " " otherwise.
+func s:hgMergeFlag(hgParents)
+  let i = stridx(a:hgParents, ':')
+  if i == -1
+    return ' '
+  endif
+  let j = strridx(a:hgParents, ':')
+  if i == j
+    return ' '
+  endif
+  return 'M'
 endfunc
 
 " ------------------------------------------------------------------------------
