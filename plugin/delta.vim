@@ -471,8 +471,10 @@ endfunc
 " of the file being edited.
 func s:getFileWorkingDirectory()
   if exists('b:fileDir')
+    echomsg "getFileWorkingDirectory: b:fileDir=".b:fileDir
     return b:fileDir
   else
+    echomsg "getFileWorkingDirectory: expand('%:h')=".expand('%:h')
     return expand('%:h')
   endif
 endfunc
@@ -528,11 +530,14 @@ func s:openDiff(diffname, readArg, rev, annotation, label)
   else
     if s:countDiffs() == 4
       echoerr "Cannot have more than four diffs at once"
+      return 0
     endif
     " put focus in the window containing the original file
     call s:gotoOrigWindow()
     " only proceed for normal buffers
-    if &buftype == ''
+    if &buftype != ''
+      return 0
+    else
       let t:origDiffBuffer = bufnr("%")
       " if there are no diff buffers in existence, save the wrap mode of the
       " original file buffer and the global wrap mode too, so that we can restore
@@ -541,8 +546,8 @@ func s:openDiff(diffname, readArg, rev, annotation, label)
       " turn off wrap mode in the original file buffer
       call s:setBufferWrapMode(0)
       let ft = &filetype
-      let readarg = s:expandReadarg(a:readArg, resolve(expand('%')))
-      let realfiledir = fnamemodify(resolve(expand('%')), ':h')
+      let readarg = s:expandPath(a:readArg, resolve(expand('%:p')))
+      let realfiledir = fnamemodify(resolve(expand('%:p')), ':h')
       set equalalways
       set eadirection=hor
       vnew
@@ -558,6 +563,11 @@ func s:openDiff(diffname, readArg, rev, annotation, label)
       let displayName .= ' ' . ((a:label != '') ? a:label : a:diffname)
       silent exe 'file' fnameescape(displayName)
       silent exe '1read' readarg
+      if s:displayError("Failure reading ".readarg, [])
+        exe 'exe' varname '"bdelete!"'
+        exe 'unlet!' varname
+        return 0
+      endif
       1d
       let &l:filetype = ft
       setlocal buftype=nofile
@@ -592,6 +602,7 @@ func s:openDiff(diffname, readArg, rev, annotation, label)
       diffupdate
     endif
   endif
+  return 1
 endfunc
 
 " Helpful for debugging
@@ -600,25 +611,22 @@ func s:echo(prefix, text)
   return a:text
 endfunc
 
-" Transform a string into text suitable as an argument to ':read':
-"  - substitute all '%' with the 'percent' path
-"  - substitute all '%:h' with the head of the 'percent' path
-"  - substitute all '%:t' with the tail of the 'percent' path
+" Expand a file path into a string template:
+"  - substitute all '%%' with 'path'
+"  - substitute all '%%:h' with the head of 'path'
+"  - substitute all '%%:t' with the tail of 'path'
 "  - escape shell metacharacters in a substituted value by appending ':S' to any of the above
-"  - substitute '%%' with '%'
-func s:expandReadarg(text, percent)
+func s:expandPath(text, path)
   " In Vim 7.4, a bug in fnamemodify() fails when the modifiers are ':h:S' and
   " the path ends in '.h'.  We work around it by invoking fnamemodify() twice,
   " once for the ':h' and once for the ':S'
-  let expanded = substitute(a:text, '%\(%\|\(\%(:[ht~.]\)\?\)\(\%(:S\)\?\)\)', '\=submatch(1) == "%" ? "%" : fnamemodify(fnamemodify(a:percent, submatch(2)), submatch(3))', "g")
-  echo "expanded=".expanded
-  return expanded
+  return substitute(a:text, '%%\(\%(:[ht~.]\)\?\)\(\%(:S\)\?\)', '\=fnamemodify(fnamemodify(a:path, submatch(1)), submatch(2))', "g")
 endfunc
 
 " Put the focus in the original diff file window and return 1 if it exists.
 " Otherwise return 0.
 func s:gotoOrigWindow()
-  if exists('t:origDiffBuffer')
+  if exists('t:origDiffBuffer') && bufwinnr(t:origDiffBuffer) != -1
     exe bufwinnr(t:origDiffBuffer) 'wincmd w'
     return 1
   endif
@@ -639,7 +647,7 @@ func s:setOrigBufferDiffMode(flag)
 endfunc
 
 func s:toggleOrigBufferDiffMode()
-  if exists('t:origDiffBuffer')
+  if exists('t:origDiffBuffer') && bufwinnr(t:origDiffBuffer) != -1
     let diff = getwinvar(bufwinnr(t:origDiffBuffer), '&diff')
     if diff
       call s:setOrigBufferDiffMode(0)
@@ -690,7 +698,7 @@ func s:openLog()
   call s:closeLog()
   " first switch to the original diff buffer, if there is one, otherwise operate
   " on the current buffer
-  if exists("t:origDiffBuffer")
+  if exists('t:origDiffBuffer') && bufwinnr(t:origDiffBuffer) != -1
     exe t:origDiffBuffer 'buffer'
   endif
   " only proceed for normal buffers
@@ -698,7 +706,7 @@ func s:openLog()
     " figure out the file name and number of the current buffer
     let t:origDiffBuffer = bufnr("%")
     let filepath = expand('%')
-    let realfilepath = resolve(filepath)
+    let realfilepath = resolve(expand('%:p'))
     let realfiledir = fnamemodify(realfilepath, ':h')
     " save the current wrap modes to restore them later
     call s:recordWrapMode()
@@ -719,39 +727,37 @@ func s:openLog()
       if s:isGitWorkingMerge(realfiledir)
         let heads = "HEAD MERGE_HEAD"
       endif
-      "silent
-      echo "Git!!"
-      exe '$read !'.s:expandReadarg("cd %:h:S >/dev/null && git log --graph --date-order --format='format:\\%%h|\\%%ai|\\%%an|\\%%s' ".heads." -- %:t:S", realfilepath)
+      silent exe '$read !'.s:expandPath("cd %%:h:S >/dev/null && git log --graph --format='format:\\%h|\\%ai|\\%an|\\%s' ".heads." -- %%:t:S", realfilepath)
       if s:displayGitError('Cannot read Git log', getline(1,'$'))
         call s:closeLog()
         return
       endif
-      setlocal filetype=gitlogcompact
       1d
       " justify the first column (graph number)
       let w = max([4, max(map(getline(1,'$'), "len(substitute(v:val, '\\x.*$', '', ''))"))])
-      silent g/\x\{6,\}|/s/^\X*/\=submatch(0).repeat(' ', w-len(submatch(0)))/
+      silent g/\x\{6,\}|/s/^\X*/\=submatch(0).repeat(' ', w-len(submatch(0)))/e
       " remove seconds from the date column
-      silent g/^\(\X*\x\{6,\}|\)\(\d\d\d\d-\d\d-\d\d \d\d:\d\d\):\d\d/s//\1\2/
+      silent g/^\(\X*\x\{6,\}|\)\(\d\d\d\d-\d\d-\d\d \d\d:\d\d\):\d\d/s//\1\2/e
       " remove timezone from the date column
-      "silent g/^\(\%([^|]*|\)\{1\}\)\([^|]*\) +\d\d\d\d|/s//\1\2|/
+      "silent g/^\(\%([^|]*|\)\{1\}\)\([^|]*\) +\d\d\d\d|/s//\1\2|/e
       " justify/truncate the username column
-      silent g/^\(\X*\x\{6,\}|[^|]*|\)\([^|]*\)/s//\=submatch(1).strpart(submatch(2),0,16).repeat(' ', 16-len(submatch(2)))/
+      silent g/^\(\X*\x\{6,\}|[^|]*|\)\([^|]*\)/s//\=submatch(1).strpart(submatch(2),0,16).repeat(' ', 16-len(submatch(2)))/e
+      setlocal filetype=gitlogcompact
+      set syntax=gitlogcompact
     elseif s:isHg(realfiledir)
       " read the mercurial log into it -- all ancestors of the current working revision
       if s:isHgWorkingMerge(realfiledir)
         " if currently merging, show '1' and '2' flags to indicate which revisions contributed to each parent
-        silent exe '$read !'.s:expandReadarg('cd %:h:S >/dev/null && hg --config defaults.log= log --rev "ancestors(p1())-ancestors(ancestor(p1(),p2()))" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}|1 +{parents}|{desc|firstline}\n" %:t:S', realfilepath)
-        silent exe '$read !'.s:expandReadarg('cd %:h:S >/dev/null && hg --config defaults.log= log --rev "ancestors(p2())-ancestors(ancestor(p1(),p2()))" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}| 2+{parents}|{desc|firstline}\n" %:t:S', realfilepath)
-        silent exe '$read !'.s:expandReadarg('cd %:h:S >/dev/null && hg --config defaults.log= log --rev "ancestors(ancestor(p1(),p2()))" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}|12+{parents}|{desc|firstline}\n" %:t:S', realfilepath)
+        silent exe '$read !'.s:expandPath('cd %%:h:S >/dev/null && hg --config defaults.log= log --rev "ancestors(p1())-ancestors(ancestor(p1(),p2()))" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}|1 +{parents}|{desc|firstline}\n" %%:t:S', realfilepath)
+        silent exe '$read !'.s:expandPath('cd %%:h:S >/dev/null && hg --config defaults.log= log --rev "ancestors(p2())-ancestors(ancestor(p1(),p2()))" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}| 2+{parents}|{desc|firstline}\n" %%:t:S', realfilepath)
+        silent exe '$read !'.s:expandPath('cd %%:h:S >/dev/null && hg --config defaults.log= log --rev "ancestors(ancestor(p1(),p2()))" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}|12+{parents}|{desc|firstline}\n" %%:t:S', realfilepath)
       else
-        silent exe '$read !'.s:expandReadarg('cd %:h:S >/dev/null && hg --config defaults.log= log --rev "ancestors(parents())" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}|+{parents}|{desc|firstline}\n" %:t:S', realfilepath)
+        silent exe '$read !'.s:expandPath('cd %%:h:S >/dev/null && hg --config defaults.log= log --rev "ancestors(parents())" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}|+{parents}|{desc|firstline}\n" %%:t:S', realfilepath)
       endif
       if s:displayHgError('Cannot read Mercurial log', getline(1,'$'))
         call s:closeLog()
         return
       endif
-      setlocal filetype=hglogcompact
       1d
       " sort by reverse date (most recent first)
       sort! /^\([^|]*|\)\{2\}/
@@ -765,6 +771,8 @@ func s:openLog()
       silent %s@^\(\%([^|]*|\)\{4\}\)\([^|]*\)@\=submatch(1).strpart(submatch(2),0,30).repeat(' ', 30-len(submatch(2)))@e
       " condense the parents column into "M" flag
       silent %s@^\(\%([^|]*|\)\{5\}\)\([^+]*+\)\([^|]*\)@\=submatch(1).submatch(2)[:-2].call('s:hgMergeFlag', [submatch(3)])@e
+      setlocal filetype=hglogcompact
+      set syntax=hglogcompact
     else
       call s:displayError("Not a Git or Mercurial repository: ".realfilepath)
       call s:closeLog()
@@ -778,7 +786,6 @@ func s:openLog()
     setlocal nomodifiable
     setlocal noswapfile
     setlocal bufhidden=delete
-    set syntax=hglogcompact
     setlocal winfixheight
     " Set up some useful key mappings.
     " The crap after the <CR> is a kludge to force Vim to synchronise the
@@ -827,52 +834,59 @@ func s:closeLog()
 endfunc
 
 func s:openLogRevisionDiffs(visual)
-  call s:closeLogRevisionDiff(1)
-  call s:closeLogRevisionDiff(2)
-  if a:visual
-    let rev1 = matchstr(getline(line("'>")), '\d\+') " earliest
-    let rev2 = matchstr(getline(line("'<")), '\d\+') " latest
-    let info = s:getHgRevisionInfo('p1(rev('.rev1.'))')
-    if len(info)
-      try
-        call s:openLogRevisionDiff(1, info.rev)
-        call s:openLogRevisionDiff(2, rev2)
-      endtry
-    endif
-  else
-    let rev = matchstr(getline('.'), '\d\+')
-    try
-      call s:openLogRevisionDiff(1, rev)
-    endtry
+  echomsg "openLogRevisionDiffs(".a:visual.")"
+  echomsg "A"
+  call s:closeLogRevisionDiffs()
+  if !exists('t:origDiffBuffer') || bufwinnr(t:origDiffBuffer) == -1
+    return
   endif
-endfunc
-
-func s:openLogRevisionDiff(n, rev)
-  let bufname = 'revision'.a:n
-  if a:rev != '' && exists('t:origDiffBuffer')
-    try
+  echomsg "B"
+  try
+    if a:visual
       if s:isGit()
-        call s:openGitDiff(bufname, a:rev, a:rev)
+        let rev1 = matchstr(getline(line("'>")), '\x\{6,\}').'^' " earliest
+        let rev2 = matchstr(getline(line("'<")), '\x\{6,\}') " latest
+        if len(rev1) && len(rev2)
+            call s:openGitDiff('revision1', rev1, rev1)
+            call s:openGitDiff('revision2', rev2, rev2)
+        endif
       elseif s:isHg()
-        call s:openHgDiff(bufname, a:rev, a:rev)
+        let rev1 = matchstr(getline(line("'>")), '\d\+') " earliest
+        let rev2 = matchstr(getline(line("'<")), '\d\+') " latest
+        let info = s:getHgRevisionInfo('p1(rev('.rev1.'))')
+        if len(rev1) && len(rev2)
+          try
+            call s:openHgDiff(1, info.rev)
+            call s:openHgDiff(2, rev2)
+          endtry
+        endif
       endif
-    finally
-      " return the focus to the log window
-      if s:gotoLogWindow()
-        call s:setBufferWrapMode(0)
+    else
+      if s:isGit()
+        echomsg "C"
+        let rev = matchstr(getline('.'), '\x\{6,\}')
+        echomsg "rev=".rev
+        if len(rev)
+          call s:openGitDiff('revision1', rev, rev)
+        endif
+      elseif s:isHg()
+        let rev = matchstr(getline('.'), '\d\+')
+        if len(rev)
+          call s:openHgDiff('revision1', rev, rev)
+        endif
       endif
-    endtry
-  endif
-endfunc
-
-func s:closeLogRevisionDiff(n)
-  let bufname = 'revision'.a:n
-  call s:closeDiff(bufname)
+    endif
+  finally
+    " return the focus to the log window
+    if s:gotoLogWindow()
+      call s:setBufferWrapMode(0)
+    endif
+  endtry
 endfunc
 
 func s:closeLogRevisionDiffs()
-  call s:closeLogRevisionDiff(1)
-  call s:closeLogRevisionDiff(2)
+  call s:closeDiff('revision2')
+  call s:closeDiff('revision1')
 endfunc
 
 " Record the global wrap mode and the wrap mode of the current buffer.
@@ -934,6 +948,7 @@ endfunc
 
 func s:isGit(...)
   let dir = a:0 ? fnamemodify(a:1, ':p:h') : s:getFileWorkingDirectory()
+  echomsg "isGit: dir=".dir
   return findfile('.git/config', dir.';') != ''
 endfunc
 
@@ -993,17 +1008,16 @@ endfunc
 " Param: label If set, replaces diffName as the displayed label
 "
 func s:openGitDiff(diffname, refspec, label)
-  let ref = a:refspec.':./'.expand('%:t')
-  let lines = split(system('cd '.shellescape(expand('%:h')).' >/dev/null && git show '.shellescape(ref).' 2>&1 1>/dev/null'), "\n")
-  if !s:displayGitError('Could not show "'.ref.'"', lines)
-    if len(lines) != 0
-      echohl ErrorMsg
-      echomsg 'Errors from "git show":'
-      echohl None
-      for line in lines
-        echomsg line
-      endfor
-    else
+"  let lines = split(system(s:expandPath('cd %%:h:S >/dev/null && git show '.a:refspec.':%%:S 2>&1 1>/dev/null', a:path)), "\n")
+"  if !s:displayGitError('Could not show '.a:refspec.':'.a:path, lines)
+"    if len(lines) != 0
+"      echohl ErrorMsg
+"      echomsg 'Errors from "git show":'
+"      echohl None
+"      for line in lines
+"        echomsg line
+"      endfor
+"    else
       let annotation = a:refspec.':'
       let hash = ""
       if a:refspec[0] != ':'
@@ -1011,13 +1025,13 @@ func s:openGitDiff(diffname, refspec, label)
         if len(info)
           let annotation = info.ahash.' '.info.date
           let hash = info.hash
+          try
+            call s:openDiff(a:diffname, '!cd %%:h >/dev/null && git show '.a:refspec.':%%', hash, annotation, a:label)
+          endtry
         endif
       endif
-      try
-        call s:openDiff(a:diffname, '!cd %:h >/dev/null && git show '.shellescape(ref), hash, annotation, a:label)
-      endtry
-    endif
-  endif
+"    endif
+"  endif
 endfunc
 
 " Return 1 if the current Git working directory is a merge (has any staged files).
@@ -1151,7 +1165,7 @@ func s:openHgDiff(diffname, rev, label)
   if len(info)
     let annotation = info.shortnode.' '.info.shortdate
     try
-      call s:openDiff(a:diffname, '!cd %:h >/dev/null && hg --config defaults.cat= cat -r '.shellescape(info.rev).' %:t', info.rev, annotation, a:label)
+      call s:openDiff(a:diffname, '!cd %%:h >/dev/null && hg --config defaults.cat= cat -r '.shellescape(info.rev).' %%:t', info.rev, annotation, a:label)
     endtry
   endif
 endfunc
