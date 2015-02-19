@@ -330,6 +330,20 @@ func s:closeHeadDiff()
   call s:closeDiff('parent1')
 endfunc
 
+func s:openTrunkDiff()
+  try
+    if s:isGit()
+      call s:openGitDiff('trunk', 'master', '')
+    elseif s:isHg()
+      call s:openHgDiff('trunk', 'default', '')
+    endif
+  endtry
+endfunc
+
+func s:closeTrunkDiff()
+  call s:closeDiff('trunk')
+endfunc
+
 func s:openMergeCommonAncestorDiff()
   let rev = get(s:getHgRevisions('--rev "ancestor(parents())"'), -1, '')
   if rev != ''
@@ -413,14 +427,6 @@ endfunc
 "  call s:closeDiff('mergedTrunk')
 "endfunc
 
-func s:openTrunkDiff()
-  call s:openHgDiff('trunk', 'default', '')
-endfunc
-
-func s:closeTrunkDiff()
-  call s:closeDiff('trunk')
-endfunc
-
 func s:openNewestReleaseDiff()
   let rev = s:newestReleaseTag()
   if rev != ''
@@ -465,16 +471,16 @@ func s:displayError(message, lines)
   return 0
 endfunc
 
-" Return the current working directory in which Mercurial commands relating to
-" the current buffer's file should be executed.  In diff and log windows, we
-" use the buffer's 'fileDir' variable, if set, otherwise we use the directory
-" of the file being edited.
+" Return the current working directory in which commands relating to the current
+" buffer's file should be executed.  In diff and log windows, we use the
+" buffer's 'fileDir' variable, if set, otherwise we use the directory of the
+" file being edited.
 func s:getFileWorkingDirectory()
   if exists('b:fileDir')
-    echomsg "getFileWorkingDirectory: b:fileDir=".b:fileDir
+    "echomsg "getFileWorkingDirectory: b:fileDir=".b:fileDir
     return b:fileDir
   else
-    echomsg "getFileWorkingDirectory: expand('%:h')=".expand('%:h')
+    "echomsg "getFileWorkingDirectory: expand('%:h')=".expand('%:h')
     return expand('%:h')
   endif
 endfunc
@@ -947,9 +953,12 @@ endfunc
 " PRIVATE FUNCTIONS - Git
 
 func s:isGit(...)
-  let dir = a:0 ? fnamemodify(a:1, ':p:h') : s:getFileWorkingDirectory()
-  echomsg "isGit: dir=".dir
-  return findfile('.git/config', dir.';') != ''
+  let dir = resolve(fnamemodify(a:0 ? a:1 : s:getFileWorkingDirectory(), ':p:h'))
+  "echomsg "isGit: dir=".dir
+  let found = findfile('.git/config', dir.';')
+  "let found = finddir('.git', dir.';')
+  "echo "isGit: found=".found
+  return found != ''
 endfunc
 
 " If the given Git output lines contain any error message, or the command
@@ -1018,6 +1027,7 @@ func s:openGitDiff(diffname, refspec, label)
 "        echomsg line
 "      endfor
 "    else
+      echomsg "s:openGitDiff(diffname=".a:diffname.", refspec=".a:refspec.", label=".a:label.")"
       let annotation = a:refspec.':'
       let hash = ""
       if a:refspec[0] != ':'
@@ -1026,7 +1036,7 @@ func s:openGitDiff(diffname, refspec, label)
           let annotation = info.ahash.' '.info.date
           let hash = info.hash
           try
-            call s:openDiff(a:diffname, '!cd %%:h >/dev/null && git show '.a:refspec.':%%', hash, annotation, a:label)
+            call s:openDiff(a:diffname, '!cd %%:h >/dev/null && git show '.a:refspec.':./%%:t', hash, annotation, a:label)
           endtry
         endif
       endif
