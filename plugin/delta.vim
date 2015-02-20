@@ -49,13 +49,13 @@ func s:help()
   echomsg m.'t   Trunk           Open a new diff window on the trunk branch head (Git "master", Hg "default")'
   echomsg m.'T                   Close the diff window opened with '.m.'t'
   echomsg m.'o   Branch origin   Open a new diff window on current branch origin (Hg only; earliest revision on current named branch)'
-  echomsg m.'O                   Close the diff window opened with '.m.'b'
+  echomsg m.'O                   Close the diff window opened with '.m.'o'
   echomsg m.'r   Release         Open a new diff window on latest release (tag with "release" prefix or version number)'
-  echomsg m.'R                   Close the diff window opened with '.m.'n'
+  echomsg m.'R                   Close the diff window opened with '.m.'r'
   echomsg m.'p   Prior release   Open a new diff window on prior release (tag with "release" prefix or version number)'
-  echomsg m.'P                   Close the diff window opened with '.m.'n'
-" echomsg m.'i   Incoming        Open a new diff window on the revision most recently merged into the current branch'
-" echomsg m.'I                   Close the diff window opened with '.m.'m'
+  echomsg m.'P                   Close the diff window opened with '.m.'p'
+" echomsg m.'m   Merged          Open a new diff window on the revision most recently merged into the current branch'
+" echomsg m.'M                   Close the diff window opened with '.m.'m'
   echomsg m.'\   Close diffs     Close all diff windows opened with the above commands'
   echomsg m.'x   Close revision  Close all diff windows opened with the <Enter> command in the log window'
   echomsg m.'-   Close diff      Close current diff window'
@@ -65,9 +65,7 @@ func s:help()
   echomsg 'During a merge:'
   echomsg m.'a   Common ancestor Open a new diff window on common merge ancestor (Git stage 1)'
   echomsg m.'A                   Close the diff window opened with '.m.'a'
-  echomsg m.'b   Merge branch    Open a new diff window on merge target branch (Git stage 2, Hg parent 1)'
-  echomsg m.'B                   Close the diff window opened with '.m.'b'
-  echomsg m.'m   Merge incoming  Open a new diff window on incoming merge head (Git stage 3, Hg parent 2)'
+  echomsg m.'m   Merge incoming  Open a new diff window on incoming merge head (Git stage MERGE_HEAD, Hg parent 2)'
   echomsg m.'M                   Close the diff window opened with '.m.'m'
   echomsg ' '
   echomsg 'Inside the log window:'
@@ -205,13 +203,10 @@ noremap <silent> <unique> <Plug>DeltaVimCloseMergeIncoming :call <SID>closeMerge
 " remaining, then turn off diff mode in the principal buffer.
 autocmd BufHidden * call s:cleanUp("global BufHidden *")
 
-" Whenever a buffer is written, refresh all the diff windows
-autocmd BufWritePost * call s:refreshWorkingCopyDiff()
-
 " ------------------------------------------------------------------------------
 " APPLICATION FUNCTIONS
 
-let s:allDiffNames = ['working', 'ancestor', 'head', 'parent1', 'parent2', 'branchOrigin', 'trunk', 'newestRelease', 'priorRelease', 'revision1', 'revision2']
+let s:allDiffNames = ['working', 'ancestor', 'head', 'parent1', 'parent2', 'origin', 'trunk', 'newestRelease', 'priorRelease', 'revision1', 'revision2']
 
 " Close all diff windows and the log window.  This operation should leave no
 " windows visible that were created by any mappings or functions in this plugin.
@@ -237,21 +232,6 @@ func s:closeCurrentDiff()
       call s:closeDiff(diffname)
     endif
   endfor
-endfunc
-
-" After a buffer is written, check if the working copy diff is visible.  If
-" so, then refresh it.
-func s:refreshWorkingCopyDiff()
-  if exists("t:workingDiffBuffer")
-    exe bufwinnr(t:workingDiffBuffer) 'wincmd w'
-    setlocal modifiable
-    silent %d
-    silent exe '1read' '#'
-    silent 1d
-    setlocal nomodifiable
-    diffupdate
-    wincmd p
-  endif
 endfunc
 
 " After any buffer is hidden, check if any diff buffers are still visible.  If
@@ -307,8 +287,26 @@ endfunc
 
 func s:openWorkingDiff()
   try
-    call s:openDiff('working', '#', '', '', '')
+    call s:openDiff('working', '!cat %%', '', '', '')
   endtry
+endfunc
+
+" Whenever a buffer is written, refresh all the diff windows
+autocmd BufWritePost * call s:refreshWorkingCopyDiff()
+
+" After a buffer is written, check if the working copy diff is visible.  If
+" so, then refresh it.
+func s:refreshWorkingCopyDiff()
+  if exists("t:workingDiffBuffer") && getbufvar(t:workingDiffBuffer, "readArg") != ''
+    exe bufwinnr(t:workingDiffBuffer) 'wincmd w'
+    setlocal modifiable
+    silent %d
+    silent exe '1read' b:readArg
+    silent 1d
+    setlocal nomodifiable
+    diffupdate
+    wincmd p
+  endif
 endfunc
 
 func s:closeWorkingDiff()
@@ -321,7 +319,10 @@ func s:openHeadDiff()
       call s:openGitDiff('head', 'HEAD', '')
     elseif s:isHg()
       call s:openHgDiff('parent1', '.', '')
+    else
+      call s:notRepository(expand('%'))
     endif
+  catch /^VimDelta:norepo/
   endtry
 endfunc
 
@@ -336,12 +337,38 @@ func s:openTrunkDiff()
       call s:openGitDiff('trunk', 'master', '')
     elseif s:isHg()
       call s:openHgDiff('trunk', 'default', '')
+    else
+      call s:notRepository(expand('%'))
     endif
+  catch /^VimDelta:norepo/
   endtry
 endfunc
 
 func s:closeTrunkDiff()
   call s:closeDiff('trunk')
+endfunc
+
+func s:openBranchOriginDiff()
+  try
+    if s:isGit()
+      let rev = s:getGitForkPoint("origin/master")
+      if rev != ''
+        call s:openGitDiff('origin', rev, '')
+      endif
+    elseif s:isHg()
+      let rev = get(s:getHgRevisions('--branch .'), -1, '')
+      if rev != ''
+        call s:openHgDiff('origin', rev, '')
+      endif
+    else
+      call s:notRepository(expand('%'))
+    endif
+  catch /^VimDelta:norepo/
+  endtry
+endfunc
+
+func s:closeBranchOriginDiff()
+  call s:closeDiff('origin')
 endfunc
 
 func s:openMergeCommonAncestorDiff()
@@ -401,19 +428,6 @@ func s:closeMergeIncomingDiff()
   call s:closeDiff('parent2')
 endfunc
 
-func s:openBranchOriginDiff()
-  let rev = get(s:getHgRevisions('--branch .'), -1, '')
-  if rev != ''
-    try
-      call s:openHgDiff('branchOrigin', rev, '')
-    endtry
-  endif
-endfunc
-
-func s:closeBranchOriginDiff()
-  call s:closeDiff('branchOrigin')
-endfunc
-
 "func s:openLastMergedTrunkDiff()
 "  let rev = s:latestHgDefaultMergeRevision()
 "  if rev != ''
@@ -427,13 +441,25 @@ endfunc
 "  call s:closeDiff('mergedTrunk')
 "endfunc
 
-func s:openNewestReleaseDiff()
-  let rev = s:newestReleaseTag()
-  if rev != ''
-    try
-      call s:openHgDiff('newestRelease', rev, rev)
-    endtry
+func s:openReleaseDiff(diffname, rev, message)
+  if a:rev != ''
+    if s:isGit()
+      call s:openGitDiff(a:diffname, a:rev, a:rev)
+    elseif s:isHg()
+      call s:openHgDiff(a:diffname, a:rev, a:rev)
+    endif
+  else
+    echohl WarningMsg
+    echomsg a:message
+    echohl None
   endif
+endfunc
+
+func s:openNewestReleaseDiff()
+  try
+    call s:openReleaseDiff('newestRelease', s:newestReleaseTag(), "No release tag")
+  catch /^VimDelta:norepo/
+  endtry
 endfunc
 
 func s:closeNewestReleaseDiff()
@@ -441,12 +467,10 @@ func s:closeNewestReleaseDiff()
 endfunc
 
 func s:openPriorReleaseDiff()
-  let rev = s:priorReleaseTag()
-  if rev != ''
-    try
-      call s:openHgDiff('priorRelease', rev, rev)
-    endtry
-  endif
+  try
+    call s:openReleaseDiff('priorRelease', s:priorReleaseTag(), "No prior release tag")
+  catch /^VimDelta:norepo/
+  endtry
 endfunc
 
 func s:closePriorReleaseDiff()
@@ -458,9 +482,12 @@ endfunc
 
 func s:displayError(message, lines)
   if v:shell_error || len(a:lines)
-    echohl ErrorMsg
-    echomsg a:message
-    echohl None
+    redraw
+    if a:message == ''
+      echohl ErrorMsg
+      echomsg a:message
+      echohl None
+    endif
     if len(a:lines)
       echohl WarningMsg
       echomsg join(a:lines, "\n")
@@ -471,17 +498,25 @@ func s:displayError(message, lines)
   return 0
 endfunc
 
+func s:notRepository(path)
+  call s:displayError('', ["Not in repository".(a:path != '' ? ": ".a:path : "")])
+  throw "VimDelta:norepo"
+endfunc
+
 " Return the current working directory in which commands relating to the current
 " buffer's file should be executed.  In diff and log windows, we use the
 " buffer's 'fileDir' variable, if set, otherwise we use the directory of the
-" file being edited.
+" file being edited if there is one, otherwise we use the current working directory.
 func s:getFileWorkingDirectory()
   if exists('b:fileDir')
     "echomsg "getFileWorkingDirectory: b:fileDir=".b:fileDir
     return b:fileDir
-  else
+  elseif expand('%') != ''
     "echomsg "getFileWorkingDirectory: expand('%:h')=".expand('%:h')
     return expand('%:h')
+  else
+    "echomsg "getFileWorkingDirectory: getcwd()=".getcwd()
+    return getcwd()
   endif
 endfunc
 
@@ -495,7 +530,6 @@ func s:allTagsSorted()
     let lines = s:allHgTags(dir)
   else
     call s:notRepository(dir)
-    let lines = []
   endif
   return sort(lines)
 endfunc
@@ -557,6 +591,7 @@ func s:openDiff(diffname, readArg, rev, annotation, label)
       set equalalways
       set eadirection=hor
       vnew
+      let b:readArg = readarg
       let b:fileDir = realfiledir
       let b:revision = a:rev
       " turn off wrap mode in the new diff buffer
@@ -568,8 +603,8 @@ func s:openDiff(diffname, readArg, rev, annotation, label)
       endif
       let displayName .= ' ' . ((a:label != '') ? a:label : a:diffname)
       silent exe 'file' fnameescape(displayName)
-      silent exe '1read' readarg
-      if s:displayError("Failure reading ".readarg, [])
+      silent exe '1read' b:readArg
+      if s:displayError("Failure reading ".b:readArg, [])
         exe 'exe' varname '"bdelete!"'
         exe 'unlet!' varname
         return 0
@@ -972,7 +1007,7 @@ endfunc
 " Return much information about a specific Git commit.
 func s:getGitRevisionInfo(refspec)
   let info = {}
-  let lines = split(system('cd '.shellescape(expand('%:h')).' >/dev/null && git log -1 --format="%h%n%H%n%ai%n%an%n%ae%nSUMMARY%n%s%nBODY%n%b" '.shellescape(a:refspec)), "\n")
+  let lines = split(system(s:expandPath('cd %% >/dev/null && git log -1 --format="%h%n%H%n%ai%n%an%n%ae%nSUMMARY%n%s%nBODY%n%b" '.shellescape(a:refspec), s:getFileWorkingDirectory())), "\n")
   if !s:displayGitError('Could not get information for refspec "'.a:refspec.'"', lines)
     if len(lines) == 0
       echohl ErrorMsg
@@ -1010,6 +1045,29 @@ func s:allGitTags(dir)
   return lines
 endfunc
 
+" Return commit ref of fork point of current branch from given trunk
+func s:getGitForkPoint(trunkref)
+  let ref = ''
+  let lines = split(system(s:expandPath('cd %% >/dev/null && git merge-base --fork-point '.shellescape(a:trunkref), s:getFileWorkingDirectory())), "\n")
+  if !s:displayGitError('Could not get fork-point for trunk "'.a:trunkref.'"', lines)
+    if len(lines) == 0
+      echohl ErrorMsg
+      echomsg 'Branch does not fork from "'.a:trunkref
+      echohl None
+    elseif len(lines) != 1
+      echohl ErrorMsg
+      echomsg 'Malformed output from "git merge-base --fork-point":'
+      echohl None
+      for line in lines
+        echomsg line
+      endfor
+    else
+      let ref = lines[0]
+    endif
+  endif
+  return ref
+endfunc
+
 " Open a new diff window containing the given Git commit.
 "
 " Param: diffname The symbolic name of the new diff buffer
@@ -1036,7 +1094,7 @@ func s:openGitDiff(diffname, refspec, label)
           let annotation = info.ahash.' '.info.date
           let hash = info.hash
           try
-            call s:openDiff(a:diffname, '!cd %%:h >/dev/null && git show '.a:refspec.':./%%:t', hash, annotation, a:label)
+            call s:openDiff(a:diffname, '!cd %%:h >/dev/null && git show '.shellescape(a:refspec).':./%%:t', hash, annotation, a:label)
           endtry
         endif
       endif
