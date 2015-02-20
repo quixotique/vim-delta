@@ -988,12 +988,8 @@ endfunc
 " PRIVATE FUNCTIONS - Git
 
 func s:isGit(...)
-  let dir = resolve(fnamemodify(a:0 ? a:1 : s:getFileWorkingDirectory(), ':p:h'))
-  "echomsg "isGit: dir=".dir
-  let found = findfile('.git/config', dir.';')
-  "let found = finddir('.git', dir.';')
-  "echo "isGit: found=".found
-  return found != ''
+  let dir = fnamemodify(resolve(fnamemodify(a:0 ? a:1 : s:getFileWorkingDirectory(), ':p')), ':h')
+  return findfile('.git/config', dir.';') != ''
 endfunc
 
 " If the given Git output lines contain any error message, or the command
@@ -1121,7 +1117,7 @@ endfunc
 " PRIVATE FUNCTIONS - Mercurial
 
 func s:isHg(...)
-  let dir = a:0 ? fnamemodify(a:1, ':p:h') : s:getFileWorkingDirectory()
+  let dir = fnamemodify(resolve(fnamemodify(a:0 ? a:1 : s:getFileWorkingDirectory(), ':p')), ':h')
   return findfile('.hg/hgrc', dir.';') != ''
 endfunc
 
