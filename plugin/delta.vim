@@ -54,12 +54,12 @@ func s:help()
   echomsg m.'R                   Close the diff window opened with '.m.'r'
   echomsg m.'p   Prior release   Open a new diff window on prior release (tag with "release" prefix or version number)'
   echomsg m.'P                   Close the diff window opened with '.m.'p'
-" echomsg m.'m   Merged          Open a new diff window on the revision most recently merged into the current branch'
-" echomsg m.'M                   Close the diff window opened with '.m.'m'
+  echomsg m.'m   Merged          Open a new diff window on the revision most recently merged into the current branch'
+  echomsg m.'M                   Close the diff window opened with '.m.'m'
   echomsg m.'\   Close diffs     Close all diff windows opened with the above commands'
   echomsg m.'x   Close revision  Close all diff windows opened with the <Enter> command in the log window'
   echomsg m.'-   Close diff      Close current diff window'
-  echomsg m.'=   Close all       Equivalent to '.m.'\ followed by '.m.'L'
+" echomsg m.'=   Close all       Equivalent to '.m.'\ followed by '.m.'L'
   echomsg m.'|   Toggle main     Toggle the diff mode of the main file window. This is useful when two diff windows are open, to see only the changes between them'
   echomsg ' '
   echomsg 'During a merge:'
@@ -130,6 +130,12 @@ if !exists('no_plugin_maps') && !exists('no_deltavim_plugin_maps')
   if !hasmapto('<Plug>DeltaVimClosePriorRelease')
     nmap <unique> <Leader>P <Plug>DeltaVimClosePriorRelease
   endif
+  if !hasmapto('<Plug>DeltaVimOpenMerge')
+    nmap <unique> <Leader>m <Plug>DeltaVimOpenMerge
+  endif
+  if !hasmapto('<Plug>DeltaVimCloseMerge')
+    nmap <unique> <Leader>M <Plug>DeltaVimCloseMerge
+  endif
   if !hasmapto('<Plug>DeltaVimCloseAllDiffs')
     nmap <unique> <Leader>\ <Plug>DeltaVimCloseAllDiffs
   endif
@@ -139,9 +145,9 @@ if !exists('no_plugin_maps') && !exists('no_deltavim_plugin_maps')
   if !hasmapto('<Plug>DeltaVimCloseWindow')
     nmap <unique> <Leader>- <Plug>DeltaVimCloseWindow
   endif
-  if !hasmapto('<Plug>DeltaVimCloseAll')
-    nmap <unique> <Leader>= <Plug>DeltaVimCloseAll
-  endif
+" if !hasmapto('<Plug>DeltaVimCloseAll')
+"   nmap <unique> <Leader>= <Plug>DeltaVimCloseAll
+" endif
   if !hasmapto('<Plug>DeltaVimToggleOrigBuffer')
     nmap <unique> <Leader>| <Plug>DeltaVimToggleOrigBuffer
   endif
@@ -150,18 +156,6 @@ if !exists('no_plugin_maps') && !exists('no_deltavim_plugin_maps')
   endif
   if !hasmapto('<Plug>DeltaVimCloseCommonAncestor')
     nmap <unique> <Leader>A <Plug>DeltaVimCloseMergeCommonAncestor
-  endif
-  if !hasmapto('<Plug>DeltaVimOpenMergeBranch')
-    nmap <unique> <Leader>b <Plug>DeltaVimOpenMergeBranch
-  endif
-  if !hasmapto('<Plug>DeltaVimCloseMergeBranch')
-    nmap <unique> <Leader>B <Plug>DeltaVimCloseMergeBranch
-  endif
-  if !hasmapto('<Plug>DeltaVimOpenMergeIncoming')
-    nmap <unique> <Leader>m <Plug>DeltaVimOpenMergeIncoming
-  endif
-  if !hasmapto('<Plug>DeltaVimCloseMergeIncoming')
-    nmap <unique> <Leader>M <Plug>DeltaVimCloseMergeIncoming
   endif
 endif
 
@@ -187,6 +181,8 @@ noremap <silent> <unique> <Plug>DeltaVimOpenNewestRelease :call <SID>openNewestR
 noremap <silent> <unique> <Plug>DeltaVimCloseNewestRelease :call <SID>closeNewestReleaseDiff()<CR>
 noremap <silent> <unique> <Plug>DeltaVimOpenPriorRelease :call <SID>openPriorReleaseDiff()<CR>
 noremap <silent> <unique> <Plug>DeltaVimClosePriorRelease :call <SID>closePriorReleaseDiff()<CR>
+noremap <silent> <unique> <Plug>DeltaVimOpenMerge :call <SID>openMergeDiff()<CR>
+noremap <silent> <unique> <Plug>DeltaVimCloseMerge :call <SID>closeMergeDiff()<CR>
 noremap <silent> <unique> <Plug>DeltaVimCloseAllDiffs :call <SID>closeAllDiffs()<CR>
 noremap <silent> <unique> <Plug>DeltaVimCloseLogRevisions :call <SID>closeLogRevisionDiffs()<CR>
 noremap <silent> <unique> <Plug>DeltaVimCloseWindow :call <SID>closeCurrentDiff()<CR>
@@ -194,10 +190,6 @@ noremap <silent> <unique> <Plug>DeltaVimCloseAll :call <SID>closeAll()<CR>
 noremap <silent> <unique> <Plug>DeltaVimToggleOrigBuffer :call <SID>toggleOrigBufferDiffMode()<CR>
 noremap <silent> <unique> <Plug>DeltaVimOpenMergeCommonAncestor :call <SID>openMergeCommonAncestorDiff()<CR>
 noremap <silent> <unique> <Plug>DeltaVimCloseMergeCommonAncestor :call <SID>closeMergeCommonAncestorDiff()<CR>
-noremap <silent> <unique> <Plug>DeltaVimOpenMergeBranch :call <SID>openMergeBranchDiff()<CR>
-noremap <silent> <unique> <Plug>DeltaVimCloseMergeBranch :call <SID>closeMergeBranchDiff()<CR>
-noremap <silent> <unique> <Plug>DeltaVimOpenMergeIncoming :call <SID>openMergeIncomingDiff()<CR>
-noremap <silent> <unique> <Plug>DeltaVimCloseMergeIncoming :call <SID>closeMergeIncomingDiff()<CR>
 
 " Whenever any buffer window goes away, if there are no more diff windows
 " remaining, then turn off diff mode in the principal buffer.
@@ -206,13 +198,13 @@ autocmd BufHidden * call s:cleanUp("global BufHidden *")
 " ------------------------------------------------------------------------------
 " APPLICATION FUNCTIONS
 
-let s:allDiffNames = ['working', 'ancestor', 'head', 'parent1', 'parent2', 'origin', 'trunk', 'newestRelease', 'priorRelease', 'revision1', 'revision2']
+let s:allDiffNames = ['working', 'ancestor', 'head', 'parent1', 'parent2', 'origin', 'trunk', 'newestRelease', 'priorRelease', 'merge', 'revision1', 'revision2']
 
 " Close all diff windows and the log window.  This operation should leave no
 " windows visible that were created by any mappings or functions in this plugin.
 func s:closeAll()
-  call s:closeAllDiffs()
   call s:closeLog()
+  call s:closeAllDiffs()
 endfunc
 
 " Close all diff windows, but leave any other special windows, eg, the log
@@ -371,6 +363,31 @@ func s:closeBranchOriginDiff()
   call s:closeDiff('origin')
 endfunc
 
+func s:openMergeDiff()
+  try
+    if s:isGit()
+      let rev = s:getGitLatestMerge("HEAD")
+      if rev != ''
+        call s:openGitDiff('merge', rev, '')
+      endif
+    elseif s:isHg()
+      call s:notSupported("Mercurial")
+"     let rev = get(s:getHgRevisions('--branch .'), -1, '')
+"     if rev != ''
+"       call s:openHgDiff('merge', rev, '')
+"     endif
+    else
+      call s:notRepository(expand('%'))
+    endif
+  catch /^VimDelta:norepo/
+  catch /^VimDelta:notsupported/
+  endtry
+endfunc
+
+func s:closeMergeDiff()
+  call s:closeDiff('merge')
+endfunc
+
 func s:openMergeCommonAncestorDiff()
   let rev = get(s:getHgRevisions('--rev "ancestor(parents())"'), -1, '')
   if rev != ''
@@ -382,28 +399,6 @@ endfunc
 
 func s:closeMergeCommonAncestorDiff()
   call s:closeDiff('ancestor')
-endfunc
-
-"func s:toggleMergeBranchDiff()
-"  if s:isDiffOpen('parent1')
-"    try
-"      call s:closeMergeBranchDiff()
-"    endtry
-"  else
-"    try
-"      call s:openMergeBranchDiff()
-"    endtry
-"  endif
-"endfunc
-
-func s:openMergeBranchDiff()
-  try
-    call s:openHgDiff('parent1', 'p1()', '')
-  endtry
-endfunc
-
-func s:closeMergeBranchDiff()
-  call s:closeDiff('parent1')
 endfunc
 
 "func s:toggleMergeIncomingDiff()
@@ -481,21 +476,16 @@ endfunc
 " PRIVATE FUNCTIONS
 
 func s:displayError(message, lines)
-  if v:shell_error || len(a:lines)
-    redraw
-    if a:message == ''
-      echohl ErrorMsg
-      echomsg a:message
-      echohl None
-    endif
-    if len(a:lines)
-      echohl WarningMsg
-      echomsg join(a:lines, "\n")
-      echohl None
-    endif
-    return 1
+  if a:message != ''
+    echohl ErrorMsg
+    echomsg a:message
+    echohl None
   endif
-  return 0
+  if len(a:lines)
+    echohl WarningMsg
+    echomsg join(a:lines, "\n")
+    echohl None
+  endif
 endfunc
 
 func s:notRepository(path)
@@ -503,20 +493,29 @@ func s:notRepository(path)
   throw "VimDelta:norepo"
 endfunc
 
+func s:notSupported(what)
+  call s:displayError('', ["Not supported in "a:what])
+  throw "VimDelta:notsupported"
+endfunc
+
 " Return the current working directory in which commands relating to the current
 " buffer's file should be executed.  In diff and log windows, we use the
 " buffer's 'fileDir' variable, if set, otherwise we use the directory of the
 " file being edited if there is one, otherwise we use the current working directory.
-func s:getFileWorkingDirectory()
-  if exists('b:fileDir')
-    "echomsg "getFileWorkingDirectory: b:fileDir=".b:fileDir
+func s:getFileWorkingDirectory(...)
+  if a:0 > 1
+    let path = resolve(fnamemodify(a:1, ':p'))
+"   echomsg "getFileWorkingDirectory: a:1=".a:1." path=".path
+    return isdirectory(path) ? path : fnamemodify(path, ':h')
+  elseif exists('b:fileDir')
+"   echomsg "getFileWorkingDirectory: b:fileDir=".b:fileDir
     return b:fileDir
   elseif expand('%') != ''
-    "echomsg "getFileWorkingDirectory: expand('%:h')=".expand('%:h')
-    return expand('%:h')
+"   echomsg "getFileWorkingDirectory: expand('%:h')=".expand('%:h')
+    return resolve(expand('%:h'))
   else
-    "echomsg "getFileWorkingDirectory: getcwd()=".getcwd()
-    return getcwd()
+"   echomsg "getFileWorkingDirectory: getcwd()=".getcwd()
+    return resolve(getcwd())
   endif
 endfunc
 
@@ -562,7 +561,7 @@ endfunc
 " Param: label If set, replaces diffName as the displayed label
 "
 func s:openDiff(diffname, readArg, rev, annotation, label)
-  "echo "openDiff(".string(a:diffname).', '.string(a:readArg).', '.string(a:rev).', '.string(a:annotation).', '.string(a:label).')'
+" echomsg "openDiff(".string(a:diffname).', '.string(a:readArg).', '.string(a:rev).', '.string(a:annotation).', '.string(a:label).')'
   let varname = "t:".a:diffname."DiffBuffer"
   if exists(varname)
     diffupdate
@@ -587,6 +586,7 @@ func s:openDiff(diffname, readArg, rev, annotation, label)
       call s:setBufferWrapMode(0)
       let ft = &filetype
       let readarg = s:expandPath(a:readArg, resolve(expand('%:p')))
+"     echomsg "readarg=".string(readarg)
       let realfiledir = fnamemodify(resolve(expand('%:p')), ':h')
       set equalalways
       set eadirection=hor
@@ -604,9 +604,14 @@ func s:openDiff(diffname, readArg, rev, annotation, label)
       let displayName .= ' ' . ((a:label != '') ? a:label : a:diffname)
       silent exe 'file' fnameescape(displayName)
       silent exe '1read' b:readArg
-      if s:displayError("Failure reading ".b:readArg, [])
+      if v:shell_error
+        let readarg = b:readArg
+        let errorlines = getbufline('%', 1, 10)
         exe 'exe' varname '"bdelete!"'
         exe 'unlet!' varname
+        redraw
+        "call s:displayError("Failure reading ".readarg, errorlines)
+        call s:displayError('', errorlines)
         return 0
       endif
       1d
@@ -815,8 +820,12 @@ func s:openLog()
       setlocal filetype=hglogcompact
       set syntax=hglogcompact
     else
-      call s:displayError("Not a Git or Mercurial repository: ".realfilepath)
-      call s:closeLog()
+      try
+        call s:notRepository(realfiledir)
+      catch /^VimDelta:norepo/
+      finally
+        call s:closeLog()
+      endtry
       return
     endif
     " go the first line (most recent revision)
@@ -829,10 +838,12 @@ func s:openLog()
     setlocal bufhidden=delete
     setlocal winfixheight
     " Set up some useful key mappings.
-    " The crap after the <CR> is a kludge to force Vim to synchronise the
-    " scrolling of the diff windows, which it does not do correctly
-    nnoremap <buffer> <silent> <CR> 10_:call <SID>openLogRevisionDiffs(0)<CR>0kj
-    vnoremap <buffer> <silent> <CR> 10_:<C-U>call <SID>openLogRevisionDiffs(1)<CR>0kj
+    " (Vim used to fail to synchronise the scrolling of the diff windows, so after :call
+    " <SID>openLogRevisionDiffs(...)<CR> the following incantation was used: 0kj
+    " but that had the unfortunate side effect of erasing any error message shown in the
+    " status line.  No longer needed in Vim 7.4.)
+    nnoremap <buffer> <silent> <CR> 10_:call <SID>openLogRevisionDiffs(0)<CR>
+    vnoremap <buffer> <silent> <CR> 10_:<C-U>call <SID>openLogRevisionDiffs(1)<CR>
     nnoremap <buffer> <silent> - 5-
     nnoremap <buffer> <silent> + 5+
     nnoremap <buffer> <silent> _ _
@@ -875,13 +886,11 @@ func s:closeLog()
 endfunc
 
 func s:openLogRevisionDiffs(visual)
-  echomsg "openLogRevisionDiffs(".a:visual.")"
-  echomsg "A"
+" echomsg "openLogRevisionDiffs(".a:visual.")"
   call s:closeLogRevisionDiffs()
   if !exists('t:origDiffBuffer') || bufwinnr(t:origDiffBuffer) == -1
     return
   endif
-  echomsg "B"
   try
     if a:visual
       if s:isGit()
@@ -904,9 +913,7 @@ func s:openLogRevisionDiffs(visual)
       endif
     else
       if s:isGit()
-        echomsg "C"
         let rev = matchstr(getline('.'), '\x\{6,\}')
-        echomsg "rev=".rev
         if len(rev)
           call s:openGitDiff('revision1', rev, rev)
         endif
@@ -988,8 +995,7 @@ endfunc
 " PRIVATE FUNCTIONS - Git
 
 func s:isGit(...)
-  let dir = fnamemodify(resolve(fnamemodify(a:0 ? a:1 : s:getFileWorkingDirectory(), ':p')), ':h')
-  return findfile('.git/config', dir.';') != ''
+  return findfile('.git/config', call('s:getFileWorkingDirectory', a:000).';') != ''
 endfunc
 
 " If the given Git output lines contain any error message, or the command
@@ -997,7 +1003,12 @@ endfunc
 " any error message from Git, then return 1 to indicate an error
 " condition.  Otherwise return 0.
 func s:displayGitError(message, lines)
-  return s:displayError(a:message, filter(copy(a:lines), 'v:val =~ "^fatal:"'))
+  let errorlines = filter(copy(a:lines), 'v:val =~ "^fatal:"')
+  if v:shell_error || len(errorlines)
+    s:displayError(a:message, errorlines)
+    return 1
+  endif
+  return 0
 endfunc
 
 " Return much information about a specific Git commit.
@@ -1047,12 +1058,35 @@ func s:getGitForkPoint(trunkref)
   let lines = split(system(s:expandPath('cd %% >/dev/null && git merge-base --fork-point '.shellescape(a:trunkref), s:getFileWorkingDirectory())), "\n")
   if !s:displayGitError('Could not get fork-point for trunk "'.a:trunkref.'"', lines)
     if len(lines) == 0
-      echohl ErrorMsg
-      echomsg 'Branch does not fork from "'.a:trunkref
+      echohl WarningMsg
+      echomsg 'Branch does not fork from '.a:trunkref
       echohl None
     elseif len(lines) != 1
       echohl ErrorMsg
       echomsg 'Malformed output from "git merge-base --fork-point":'
+      echohl None
+      for line in lines
+        echomsg line
+      endfor
+    else
+      let ref = lines[0]
+    endif
+  endif
+  return ref
+endfunc
+
+" Return commit ref of most recent merge at or before given commit
+func s:getGitLatestMerge(ref)
+  let ref = ''
+  let lines = split(system(s:expandPath('cd %% >/dev/null && git rev-list -n1 --min-parents=2 '.shellescape(a:ref), s:getFileWorkingDirectory())), "\n")
+  if !s:displayGitError('Could not get latest merge before '.a:ref, lines)
+    if len(lines) == 0
+      echohl WarningMsg
+      echomsg 'No merge before '.a:ref
+      echohl None
+    elseif len(lines) != 1
+      echohl ErrorMsg
+      echomsg 'Malformed output from "git rev-list -n1 --min-parents=2":'
       echohl None
       for line in lines
         echomsg line
@@ -1081,11 +1115,12 @@ func s:openGitDiff(diffname, refspec, label)
 "        echomsg line
 "      endfor
 "    else
-      echomsg "s:openGitDiff(diffname=".a:diffname.", refspec=".a:refspec.", label=".a:label.")"
+"     echomsg "s:openGitDiff(diffname=".a:diffname.", refspec=".a:refspec.", label=".a:label.")"
       let annotation = a:refspec.':'
       let hash = ""
       if a:refspec[0] != ':'
         let info = s:getGitRevisionInfo(a:refspec)
+"       echomsg "info=".string(info)
         if len(info)
           let annotation = info.ahash.' '.info.date
           let hash = info.hash
@@ -1117,8 +1152,7 @@ endfunc
 " PRIVATE FUNCTIONS - Mercurial
 
 func s:isHg(...)
-  let dir = fnamemodify(resolve(fnamemodify(a:0 ? a:1 : s:getFileWorkingDirectory(), ':p')), ':h')
-  return findfile('.hg/hgrc', dir.';') != ''
+  return findfile('.hg/hgrc', call('s:getFileWorkingDirectory', a:000).';') != ''
 endfunc
 
 " If the given Mercurial output lines contain any error message, or the command
@@ -1126,7 +1160,12 @@ endfunc
 " any error message from Mercurial, then return 1 to indicate an error
 " condition.  Otherwise return 0.
 func s:displayHgError(message, lines)
-  return s:displayError(a:message, filter(copy(a:lines), 'v:val =~ "^\\*\\*\\*"'))
+  let errorlines = filter(copy(a:lines), 'v:val =~ "^\\*\\*\\*"')
+  if v:shell_error || len(errorlines)
+    s:displayError(a:message, errorlines)
+    return 1
+  endif
+  return 0
 endfunc
 
 " Return much information about a specific Mercurial revision.
