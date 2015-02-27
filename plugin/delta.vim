@@ -511,10 +511,10 @@ func s:getFileWorkingDirectory(...)
 "   echomsg "getFileWorkingDirectory: b:fileDir=".b:fileDir
     return b:fileDir
   elseif expand('%') != ''
-"   echomsg "getFileWorkingDirectory: expand('%:h')=".expand('%:h')
-    return resolve(expand('%:h'))
+"   echomsg "getFileWorkingDirectory: fnamemodify(resolve(expand('%:p')),':h')=".fnamemodify(resolve(expand('%:p')),':h')
+    return fnamemodify(resolve(expand('%:p')), ':h')
   else
-"   echomsg "getFileWorkingDirectory: getcwd()=".getcwd()
+"   echomsg "getFileWorkingDirectory: resolve(getcwd())=".resolve(getcwd())
     return resolve(getcwd())
   endif
 endfunc
