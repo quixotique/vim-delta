@@ -1,9 +1,9 @@
 delta.vim
 =========
 
-A [Vim][] plugin for opening and managing diff windows between the working
-copy, previous changesets, current branch head and origin, and merge parents in
-any [Mercurial][] repository.  Support for [Git][] repositories is coming soon!
+A [Vim][] plugin for opening and managing diff windows between the working copy,
+previous changesets, current branch head and origin, and merge parents in any
+[Git][] or [Mercurial][] repository.
 
 Installation
 ------------
@@ -50,8 +50,9 @@ The following instructions assume that STEP 1 placed the plugin files under the
 `vim-delta` sub-directory of your home directory.  If you placed them in
 another location, you must adapt the following instructions.
 
- * IF YOU USE [Pathogen][], move the cloned/unpacked/fetched plugin
-   sub-directory created in STEP 1 to a place where it will be a Vim bundle:
+ * IF YOU USE [Pathogen][] (recommended), move the cloned/unpacked/fetched
+   plugin sub-directory created in STEP 1 to a place where it will be a Vim
+   bundle:
 
         cd
         mkdir -p .vim/bundle
@@ -86,7 +87,7 @@ Troubleshooting
 If the `\?` command does not do anything, then test if the plugin was loaded by
 starting a new Vim instance and typing the following command:
 
-    :echo g:loaded_DeltaVim_Hg
+    :echo g:loaded_DeltaVim
 
 This should print a single `1` on the bottom line of the Vim window.  If it
 does not, then the plugin was not loaded.  This could be for various reasons:
@@ -98,13 +99,14 @@ does not, then the plugin was not loaded.  This could be for various reasons:
 
  * the plugin files were not installed correctly (see STEP 2 above)
 
-If the above command prints `1`, then test whether the plugin's key mappings
-were set up by starting a new Vim instance and typing the following command:
+If the above command prints `1`, then the plugin has been loaded.  Test whether
+the plugin's key mappings were set up by starting a new Vim instance and typing
+the following command:
 
     :echo hasmapto('<Plug>DeltaVimHelp')
 
 If this prints `0` on the bottom line of the Vim window, then the plugin's key
-maps were not set up.  Test the reason by starting a new Vim instance and
+maps were not set up.  Discover the reason by starting a new Vim instance and
 typing the following Vim command:
 
     :echo exists('no_plugin_maps') + exists('no_deltavim_plugin_maps')
@@ -113,15 +115,15 @@ typing the following Vim command:
    plugin file or your [vimrc][] file has explicitly disabled key mappings by
    setting one (or both) of the Vim global variables `no_plugin_maps` and
    `no_deltavim_plugin_maps`.  You will have to search through the source code of
-   these files to discover where this is done, then decide whether to reverse
-   the action to let the plugin set up its own key mappings, or whether to
-   leave it and set up your own key mappings.
+   these files to discover where and why this is done, then decide whether to
+   reverse the action to let the delta.vim plugin set up its own key mappings,
+   or whether to leave it and set up your own delta.vim key mappings.
 
  * if the above command prints `0` then there is another problem preventing the
    key mappings from being set up.  Please investigate in depth if you can, and
    report the problem as a [vim-delta issue][].
 
-If the *echo hasmapto* command above prints `1` on the bottom line of the Vim
+If the *echo hasmapto* command above printed `1` on the bottom line of the Vim
 window, then the plugin should have set up its key mapping to the help command.
 In this case, there are several reasons why the `\?` command does not work:
 
@@ -165,8 +167,8 @@ History
 -------
 
 The Delta Vim plugin for [Mercurial][] was originally developed in 2011 by
-[Andrew Bettison][] as an employee of [Tuenti Technologies, S.L.][] (in Madrid,
-Spain).  Andrew later modified and improved the plugin in his own capacity, and
+[Andrew Bettison][] as an employee of [Tuenti Technologies, S.L.][] in Madrid,
+Spain.  Andrew later modified and improved the plugin in his own capacity, and
 released it on [GitHub][vim-delta] in 2014 under public license with permission
 from Tuenti.
 
@@ -178,6 +180,7 @@ This document is available under the [Creative Commons Attribution 4.0 Internati
 [vim-delta]: https://github.com/quixotique/vim-delta
 [vim-delta issue]: https://github.com/quixotique/vim-delta/issues
 [Vim]: http://www.vim.org/
+[Git]: http://git-scm.com/
 [Mercurial]: http://mercurial.selenic.com/
 [GPL3]: ./LICENSE-SOFTWARE.md
 [CC BY 4.0]: ./LICENSE-DOCUMENTATION.md
@@ -187,7 +190,6 @@ This document is available under the [Creative Commons Attribution 4.0 Internati
 [Unix-like]: http://en.wikipedia.org/wiki/Unix-like
 [GNU/Linux]: http://en.wikipedia.org/wiki/Linux
 [Unix shell]: http://en.wikipedia.org/wiki/Unix_shell
-[Git]: http://git-scm.com/
 [Zip]: http://en.wikipedia.org/wiki/Zip_(file_format)
 [Pathogen]: https://github.com/tpope/vim-pathogen
 [runtimepath]: http://usevim.com/2012/12/28/vim-101-runtimepath/
