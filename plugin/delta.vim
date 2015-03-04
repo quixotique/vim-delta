@@ -344,18 +344,20 @@ func s:openBranchOriginDiff()
   try
     if s:isGit()
       let rev = s:getGitForkPoint("origin/master")
-      if rev != ''
-        call s:openGitDiff('origin', rev, '')
-      endif
+      call s:openGitDiff('origin', rev, '')
     elseif s:isHg()
       let rev = get(s:getHgRevisions('--branch .'), -1, '')
       if rev != ''
         call s:openHgDiff('origin', rev, '')
+      else
+        call s:displayError('Cannot determine branch origin revision', [])
       endif
     else
       call s:notRepository(expand('%'))
     endif
   catch /^VimDelta:norepo/
+  catch /^VimDelta:commandfail/
+  catch /^VimDelta:notfound/
   endtry
 endfunc
 
@@ -366,9 +368,10 @@ endfunc
 func s:openMergeDiff()
   try
     if s:isGit()
-      let rev = s:getGitLatestMerge("HEAD")
-      if rev != ''
-        call s:openGitDiff('merge', rev, '')
+      if s:isGitWorkingMerge()
+        call s:openGitDiff('merge', ':3', '')
+      else
+        call s:openGitDiff('merge', s:getGitLatestMerge("HEAD"), '')
       endif
     elseif s:isHg()
       call s:notSupported("Mercurial")
@@ -381,6 +384,9 @@ func s:openMergeDiff()
     endif
   catch /^VimDelta:norepo/
   catch /^VimDelta:notsupported/
+  catch /^VimDelta:commandfail/
+  catch /^VimDelta:nofile/
+  catch /^VimDelta:notfound/
   endtry
 endfunc
 
@@ -389,12 +395,29 @@ func s:closeMergeDiff()
 endfunc
 
 func s:openMergeCommonAncestorDiff()
-  let rev = get(s:getHgRevisions('--rev "ancestor(parents())"'), -1, '')
-  if rev != ''
-    try
+  try
+    if s:isGit()
+      call s:openGitDiff('ancestor', ':1', '')
+    elseif s:isHg()
+      if !s:isHgWorkingMerge()
+        call s:notMerging()
+      endif
+      let rev = get(s:getHgRevisions('--rev "ancestor(parents())"'), -1, '')
+      if rev == ''
+        call s:displayError('Cannot determine ancestor revision', [])
+        throw "VimDelta:notfound"
+      endif
       call s:openHgDiff('ancestor', rev, '')
-    endtry
-  endif
+    else
+      call s:notRepository(expand('%'))
+    endif
+  catch /^VimDelta:norepo/
+  catch /^VimDelta:notsupported/
+  catch /^VimDelta:notmerge/
+  catch /^VimDelta:commandfail/
+  catch /^VimDelta:nofile/
+  catch /^VimDelta:notfound/
+  endtry
 endfunc
 
 func s:closeMergeCommonAncestorDiff()
@@ -437,16 +460,16 @@ endfunc
 "endfunc
 
 func s:openReleaseDiff(diffname, rev, message)
-  if a:rev != ''
-    if s:isGit()
-      call s:openGitDiff(a:diffname, a:rev, a:rev)
-    elseif s:isHg()
-      call s:openHgDiff(a:diffname, a:rev, a:rev)
-    endif
-  else
+  if a:rev == ''
     echohl WarningMsg
     echomsg a:message
     echohl None
+    throw "VimDelta:notfound"
+  endif
+  if s:isGit()
+    call s:openGitDiff(a:diffname, a:rev, a:rev)
+  elseif s:isHg()
+    call s:openHgDiff(a:diffname, a:rev, a:rev)
   endif
 endfunc
 
@@ -454,6 +477,8 @@ func s:openNewestReleaseDiff()
   try
     call s:openReleaseDiff('newestRelease', s:newestReleaseTag(), "No release tag")
   catch /^VimDelta:norepo/
+  catch /^VimDelta:commandfail/
+  catch /^VimDelta:notfound/
   endtry
 endfunc
 
@@ -465,6 +490,8 @@ func s:openPriorReleaseDiff()
   try
     call s:openReleaseDiff('priorRelease', s:priorReleaseTag(), "No prior release tag")
   catch /^VimDelta:norepo/
+  catch /^VimDelta:commandfail/
+  catch /^VimDelta:notfound/
   endtry
 endfunc
 
@@ -486,6 +513,11 @@ func s:displayError(message, lines)
     echomsg join(a:lines, "\n")
     echohl None
   endif
+endfunc
+
+func s:notMerging(path)
+  call s:displayError('', ["Not available unless merging")])
+  throw "VimDelta:notmerge"
 endfunc
 
 func s:notRepository(path)
@@ -517,6 +549,19 @@ func s:getFileWorkingDirectory(...)
 "   echomsg "getFileWorkingDirectory: resolve(getcwd())=".resolve(getcwd())
     return resolve(getcwd())
   endif
+endfunc
+
+" Return the current working file.  In diff and log windows, we use the buffer's 'filePath' variable, if set, otherwise
+" we use the current buffer's file name.
+func s:getFilePath()
+  if exists('b:filePath')
+"   echomsg "getFilePath: b:filePath=".b:filePath
+    return b:filePath
+  elseif expand('%') != ''
+"   echomsg "getFilePath: resolve(expand('%:p'))=".resolve(expand('%:p'))
+    return resolve(expand('%:p'))
+  endif
+  throw "VimDelta:nofile"
 endfunc
 
 " Return a list of the names of all tags in the current file's repository, in
@@ -587,11 +632,13 @@ func s:openDiff(diffname, readArg, rev, annotation, label)
       let ft = &filetype
       let readarg = s:expandPath(a:readArg, resolve(expand('%:p')))
 "     echomsg "readarg=".string(readarg)
-      let realfiledir = fnamemodify(resolve(expand('%:p')), ':h')
+      let realfilepath = resolve(expand('%:p'))
+      let realfiledir = fnamemodify(realfilepath, ':h')
       set equalalways
       set eadirection=hor
       vnew
       let b:readArg = readarg
+      let b:filePath = realfilepath
       let b:fileDir = realfiledir
       let b:revision = a:rev
       " turn off wrap mode in the new diff buffer
@@ -1047,7 +1094,7 @@ endfunc
 func s:allGitTags(dir)
   let lines = split(system('cd '.shellescape(a:dir).' >/dev/null && git tag --list'), "\n")
   if s:displayGitError('Could not get list of Git tags', lines)
-    return []
+    throw "VimDelta:commandfail"
   endif
   return lines
 endfunc
@@ -1056,46 +1103,40 @@ endfunc
 func s:getGitForkPoint(trunkref)
   let ref = ''
   let lines = split(system(s:expandPath('cd %% >/dev/null && git merge-base --fork-point '.shellescape(a:trunkref), s:getFileWorkingDirectory())), "\n")
-  if !s:displayGitError('Could not get fork-point for trunk "'.a:trunkref.'"', lines)
-    if len(lines) == 0
-      echohl WarningMsg
-      echomsg 'Branch does not fork from '.a:trunkref
-      echohl None
-    elseif len(lines) != 1
-      echohl ErrorMsg
-      echomsg 'Malformed output from "git merge-base --fork-point":'
-      echohl None
-      for line in lines
-        echomsg line
-      endfor
-    else
-      let ref = lines[0]
-    endif
+  if s:displayGitError('Could not get fork-point for trunk "'.a:trunkref.'"', lines)
+    throw "VimDelta:commandfail"
   endif
-  return ref
+  if len(lines) == 0
+    echohl WarningMsg
+    echomsg 'Branch does not fork from '.a:trunkref
+    echohl None
+    throw "VimDelta:notfound"
+  endif
+  if len(lines) != 1
+    call s:displayError('Malformed output from "git merge-base --fork-point":', lines)
+    throw "VimDelta:commandfail"
+  endif
+  return lines[0]
 endfunc
 
 " Return commit ref of most recent merge at or before given commit
 func s:getGitLatestMerge(ref)
   let ref = ''
   let lines = split(system(s:expandPath('cd %% >/dev/null && git rev-list -n1 --min-parents=2 '.shellescape(a:ref), s:getFileWorkingDirectory())), "\n")
-  if !s:displayGitError('Could not get latest merge before '.a:ref, lines)
-    if len(lines) == 0
-      echohl WarningMsg
-      echomsg 'No merge before '.a:ref
-      echohl None
-    elseif len(lines) != 1
-      echohl ErrorMsg
-      echomsg 'Malformed output from "git rev-list -n1 --min-parents=2":'
-      echohl None
-      for line in lines
-        echomsg line
-      endfor
-    else
-      let ref = lines[0]
-    endif
+  if s:displayGitError('Could not get latest merge before '.a:ref, lines)
+    throw "VimDelta:commandfail"
   endif
-  return ref
+  if len(lines) == 0
+    echohl WarningMsg
+    echomsg 'No merge before '.a:ref
+    echohl None
+    throw "VimDelta:notfound"
+  endif
+  if len(lines) != 1
+    call s:displayError('Malformed output from "git rev-list -n1 --min-parents=2":', lines)
+    throw "VimDelta:commandfail"
+  endif
+  return lines[0]
 endfunc
 
 " Open a new diff window containing the given Git commit.
@@ -1105,44 +1146,36 @@ endfunc
 " Param: label If set, replaces diffName as the displayed label
 "
 func s:openGitDiff(diffname, refspec, label)
-"  let lines = split(system(s:expandPath('cd %%:h:S >/dev/null && git show '.a:refspec.':%%:S 2>&1 1>/dev/null', a:path)), "\n")
-"  if !s:displayGitError('Could not show '.a:refspec.':'.a:path, lines)
-"    if len(lines) != 0
-"      echohl ErrorMsg
-"      echomsg 'Errors from "git show":'
-"      echohl None
-"      for line in lines
-"        echomsg line
-"      endfor
-"    else
-"     echomsg "s:openGitDiff(diffname=".a:diffname.", refspec=".a:refspec.", label=".a:label.")"
-      let annotation = a:refspec.':'
-      let hash = ""
-      if a:refspec[0] != ':'
-        let info = s:getGitRevisionInfo(a:refspec)
-"       echomsg "info=".string(info)
-        if len(info)
-          let annotation = info.ahash.' '.info.date
-          let hash = info.hash
-          try
-            call s:openDiff(a:diffname, '!cd %%:h >/dev/null && git show '.shellescape(a:refspec).':./%%:t', hash, annotation, a:label)
-          endtry
-        endif
-      endif
-"    endif
-"  endif
+" echomsg "s:openGitDiff(diffname=".a:diffname.", refspec=".a:refspec.", label=".a:label.")"
+  let annotation = a:refspec.':'
+  let hash = ''
+  if a:refspec[0] != ':'
+    let info = s:getGitRevisionInfo(a:refspec)
+"   echomsg "info=".string(info)
+    if len(info)
+      let annotation = info.ahash.' '.info.date
+      let hash = info.hash
+    endif
+  endif
+  try
+    call s:openDiff(a:diffname, '!cd %%:h >/dev/null && git show '.shellescape(a:refspec).':./%%:t', hash, annotation, a:label)
+  endtry
 endfunc
 
 " Return 1 if the current Git working directory is a merge (has any staged files).
-func s:isGitWorkingMerge(dir)
-  let nfiles = system('cd '.shellescape(a:dir)." >/dev/null && git ls-files --stage | awk 'BEGIN { nfiles = 0 } $3 != 0 { ++nfiles } END { print nfiles }'")
-  if v:shell_error
-    echohl ErrorMsg
-    echomsg 'Could not count Git staged files'
-    echohl None
-    return 0
+func s:isGitWorkingMerge(...)
+  let lines = split(system(s:expandPath('cd %%:S >/dev/null && git ls-files --stage', call('s:getFileWorkingDirectory', a:000))), "\n")
+  if s:displayGitError('Failed command: git ls-files', lines)
+    throw "VimDelta:commandfail"
   endif
-  if str2nr(nfiles) != 0
+  let nstaged = 0
+  for line in lines
+    let words = split(line)
+    if len(words) >= 2 && words[2] != '0'
+      let nstaged += 1
+    endif
+  endfor
+  if nstaged != 0
     return 1
   endif
   return 0
@@ -1216,7 +1249,7 @@ func s:getHgRevisions(hgLogOpts)
   let dir = s:getFileWorkingDirectory()
   let lines = split(system('cd '.shellescape(dir).' >/dev/null  && hg --config defaults.log= log --template "{node}\n" '.a:hgLogOpts), "\n")
   if s:displayHgError('Could not get revisions from "hg log '.a:hgLogOpts.'"', lines)
-    return []
+    throw "VimDelta:commandfail"
   endif
   return lines
 endfunc
@@ -1226,7 +1259,7 @@ endfunc
 func s:allHgTags(dir)
   let lines = split(system('cd '.shellescape(a:dir).' >/dev/null && hg --config defaults.tags= tags'), "\n")
   if s:displayHgError('Could not get list of Mercurial tags', lines)
-    return []
+    throw "VimDelta:commandfail"
   endif
   call map(lines, 'substitute("\s\+\d\+:\x{8-}$", "")')
   return lines
@@ -1268,21 +1301,18 @@ func s:openHgDiff(diffname, rev, label)
   if len(info)
     let annotation = info.shortnode.' '.info.shortdate
     try
-      call s:openDiff(a:diffname, '!cd %%:h >/dev/null && hg --config defaults.cat= cat -r '.shellescape(info.rev).' %%:t', info.rev, annotation, a:label)
+      call s:openDiff(a:diffname, '!cd %%:h:S >/dev/null && hg --config defaults.cat= cat -r '.shellescape(info.rev).' %%:t:S', info.rev, annotation, a:label)
     endtry
   endif
 endfunc
 
 " Return 1 if the current Mercurial working directory is a merge (has two parents).
-func s:isHgWorkingMerge(dir)
-  let nparents = system('cd '.shellescape(a:dir).' >/dev/null && hg --config defaults.parents= parents --template "x\n" | wc --lines')
-  if v:shell_error
-    echohl ErrorMsg
-    echomsg 'Could not count Mercurial parents of working directory'
-    echohl None
-    return 0
+func s:isHgWorkingMerge(...)
+  let parents = split(system(s:expandPath('cd %%:S >/dev/null && hg --config defaults.parents= parents --template "{node}\n"'), "\n"), call('s:getFileWorkingDirectory', a:000))
+  if s:displayHgError('Failed command: hg parents', parents)
+    throw "VimDelta:commandfail"
   endif
-  if str2nr(nparents) == 2
+  if len(parents) == 2
     return 1
   endif
   return 0
