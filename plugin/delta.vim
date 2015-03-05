@@ -1227,7 +1227,7 @@ func s:allHgTags(dir)
   if s:displayHgError('Could not get list of Mercurial tags', lines)
     throw "VimDelta:commandfail"
   endif
-  call map(lines, 'substitute("\s\+\d\+:\x{8-}$", "")')
+  call map(lines, 'substitute(v:val, "\s\+\d\+:\x{8-}$", "", "")')
   return lines
 endfunc
 
