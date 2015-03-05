@@ -229,12 +229,6 @@ endfunc
 " After any buffer is hidden, check if any diff buffers are still visible.  If
 " not, then turn off diff mode, restore wrap mode, and clean up variables.
 func s:cleanUp(desc)
-  "echo 'cleanUp("'.a:desc.'"): bufnr("%") = ' . bufnr('%')
-  "echo 'exists("t:origDiffBuffer") = ' . exists('t:origDiffBuffer')
-  "if exists('t:origDiffBuffer')
-  "  echo 't:origDiffBuffer = ' . t:origDiffBuffer
-  "  echo 'bufwinnr(t:origDiffBuffer) = ' . bufwinnr(t:origDiffBuffer)
-  "endif
   if exists('t:turnOffDiff') && t:turnOffDiff == bufnr('%')
     " This is a kludge, to work around a bug that the :diffoff! below does not turn
     " off diff mode in the buffer that is being left.
@@ -242,7 +236,6 @@ func s:cleanUp(desc)
     unlet t:turnOffDiff
     call s:restoreWrapMode()
   endif
-  "echo 's:countDiffs() == ' . s:countDiffs() . '  s:testLogExists() == ' . s:testLogExists()
   if s:countDiffs() == 0
     diffoff!
     call s:restoreWrapMode()
@@ -251,14 +244,12 @@ func s:cleanUp(desc)
       let t:turnOffDiff = t:origDiffBuffer
       if !s:testLogExists()
         unlet! t:origDiffBuffer
-        "echo 'unlet! t:origDiffBuffer (A)'
       endif
     endif
   endif
   if !s:testLogExists()
     unlet! t:logBuffer
   endif
-  "echo 'WAH'
 endfunc
 
 func s:openRevisionDiff(rev)
@@ -422,28 +413,6 @@ endfunc
 
 func s:closeMergeCommonAncestorDiff()
   call s:closeDiff('ancestor')
-endfunc
-
-"func s:toggleMergeIncomingDiff()
-"  if s:isDiffOpen('parent2')
-"    try
-"      call s:closeMergeIncomingDiff()
-"    endtry
-"  else
-"    try
-"      call s:openMergeIncomingDiff()
-"    endtry
-"  endif
-"endfunc
-
-func s:openMergeIncomingDiff()
-  try
-    call s:openHgDiff('parent2', 'p2()', '')
-  endtry
-endfunc
-
-func s:closeMergeIncomingDiff()
-  call s:closeDiff('parent2')
 endfunc
 
 "func s:openLastMergedTrunkDiff()
