@@ -253,15 +253,18 @@ func s:cleanUp(desc)
 endfunc
 
 func s:openRevisionDiff(rev)
-  if a:rev != ''
-    try
+  try
+    if a:rev != ''
       if s:isGit()
         call s:openGitDiff('revision1', a:rev, a:rev)
       elseif s:isHg()
         call s:openHgDiff('revision1', a:rev, a:rev)
       endif
-    endtry
-  endif
+    endif
+  catch /^VimDelta:norepo/
+  catch /^VimDelta:nofile/
+  catch /^VimDelta:notfound/
+  endtry
 endfunc
 
 func s:closeRevisionDiff(rev)
@@ -306,6 +309,8 @@ func s:openHeadDiff()
       call s:notRepository(expand('%'))
     endif
   catch /^VimDelta:norepo/
+  catch /^VimDelta:nofile/
+  catch /^VimDelta:notfound/
   endtry
 endfunc
 
@@ -324,6 +329,8 @@ func s:openTrunkDiff()
       call s:notRepository(expand('%'))
     endif
   catch /^VimDelta:norepo/
+  catch /^VimDelta:nofile/
+  catch /^VimDelta:notfound/
   endtry
 endfunc
 
@@ -348,6 +355,7 @@ func s:openBranchOriginDiff()
     endif
   catch /^VimDelta:norepo/
   catch /^VimDelta:commandfail/
+  catch /^VimDelta:nofile/
   catch /^VimDelta:notfound/
   endtry
 endfunc
@@ -940,6 +948,9 @@ func s:openLogRevisionDiffs(visual)
         endif
       endif
     endif
+  catch /^VimDelta:norepo/
+  catch /^VimDelta:nofile/
+  catch /^VimDelta:notfound/
   finally
     " return the focus to the log window
     if s:gotoLogWindow()
@@ -1164,7 +1175,7 @@ endfunc
 func s:displayHgError(message, lines)
   let errorlines = filter(copy(a:lines), 'v:val =~ "^\\*\\*\\*"')
   if v:shell_error || len(errorlines)
-    s:displayError(a:message, errorlines)
+    call s:displayError(a:message, errorlines)
     return 1
   endif
   return 0
@@ -1267,12 +1278,13 @@ endfunc
 "
 func s:openHgDiff(diffname, rev, label)
   let info = s:getHgRevisionInfo(a:rev)
-  if len(info)
-    let annotation = info.shortnode.' '.info.shortdate
-    try
-      call s:openDiff(a:diffname, '!cd %%:h:S >/dev/null && hg --config defaults.cat= cat -r '.shellescape(info.rev).' %%:t:S', info.rev, annotation, a:label)
-    endtry
+  if len(info) == 0
+    throw "VimDelta:notfound"
   endif
+  let annotation = info.shortnode.' '.info.shortdate
+  try
+    call s:openDiff(a:diffname, '!cd %%:h:S >/dev/null && hg --config defaults.cat= cat -r '.shellescape(info.rev).' %%:t:S', info.rev, annotation, a:label)
+  endtry
 endfunc
 
 " Return 1 if the current Mercurial working directory is a merge (has two parents).
