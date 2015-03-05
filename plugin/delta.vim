@@ -921,18 +921,16 @@ func s:openLogRevisionDiffs(visual)
         let rev1 = matchstr(getline(line("'>")), '\x\{6,\}').'^' " earliest
         let rev2 = matchstr(getline(line("'<")), '\x\{6,\}') " latest
         if len(rev1) && len(rev2)
-            call s:openGitDiff('revision1', rev1, rev1)
-            call s:openGitDiff('revision2', rev2, rev2)
+          call s:openGitDiff('revision1', rev1, rev1)
+          call s:openGitDiff('revision2', rev2, rev2)
         endif
       elseif s:isHg()
         let rev1 = matchstr(getline(line("'>")), '\d\+') " earliest
         let rev2 = matchstr(getline(line("'<")), '\d\+') " latest
         let info = s:getHgRevisionInfo('p1(rev('.rev1.'))')
-        if len(rev1) && len(rev2)
-          try
-            call s:openHgDiff(1, info.rev)
-            call s:openHgDiff(2, rev2)
-          endtry
+        if len(info) && len(rev2)
+          call s:openHgDiff('revision1', info.rev, info.rev)
+          call s:openHgDiff('revision2', rev2, rev2)
         endif
       endif
     else
