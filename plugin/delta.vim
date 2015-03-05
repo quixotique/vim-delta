@@ -21,6 +21,12 @@ let s:keepcpo = &cpo
 set cpo&vim
 
 " Settings that can be overridden by the user.
+if !exists('g:DeltaVim_gitTrunkBranch')
+  let g:DeltaVim_gitTrunkBranch="master"
+endif
+if !exists('g:DeltaVim_hgTrunkBranch')
+  let g:DeltaVim_hgTrunkBranch="default"
+endif
 if !exists('*DeltaVim_isReleaseTag')
   func DeltaVim_isReleaseTag(tagname)
     " Any tag with a name that looks like a version number, eg, 1.4, 0.92.7
@@ -46,7 +52,7 @@ func s:help()
   echomsg m.'W                   Close the diff window opened with '.m.'w'
   echomsg m.'h   Head            Open a new diff window on the current branch head (Git HEAD, Hg parent 1)'
   echomsg m.'H                   Close the diff window opened with '.m.'h'
-  echomsg m.'t   Trunk           Open a new diff window on the trunk branch head (Git "master", Hg "default")'
+  echomsg m.'t   Trunk           Open a new diff window on the trunk branch head (Git "'.g:DeltaVim_gitTrunkBranch.'", Hg "'.g:DeltaVim_hgTrunkBranch.'")'
   echomsg m.'T                   Close the diff window opened with '.m.'t'
   echomsg m.'o   Branch origin   Open a new diff window on current branch origin (Hg only; earliest revision on current named branch)'
   echomsg m.'O                   Close the diff window opened with '.m.'o'
@@ -322,9 +328,9 @@ endfunc
 func s:openTrunkDiff()
   try
     if s:isGit()
-      call s:openGitDiff('trunk', 'master', '')
+      call s:openGitDiff('trunk', g:DeltaVim_gitTrunkBranch, '')
     elseif s:isHg()
-      call s:openHgDiff('trunk', 'default', '')
+      call s:openHgDiff('trunk', g:DeltaVim_hgTrunkBranch, '')
     else
       call s:notRepository(expand('%'))
     endif
