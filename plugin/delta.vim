@@ -1275,7 +1275,7 @@ endfunc
 
 " Return 1 if the current Mercurial working directory is a merge (has two parents).
 func s:isHgWorkingMerge(...)
-  let parents = split(system(s:expandPath('cd %%:S >/dev/null && hg --config defaults.parents= parents --template "{node}\n"'), "\n"), call('s:getFileWorkingDirectory', a:000))
+  let parents = split(system(s:expandPath('cd %%:S >/dev/null && hg --config defaults.parents= parents --template "{node}\n"', call('s:getFileWorkingDirectory', a:000))), "\n")
   if s:displayHgError('Failed command: hg parents', parents)
     throw "VimDelta:commandfail"
   endif
