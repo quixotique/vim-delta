@@ -373,11 +373,9 @@ func s:openMergeDiff()
         call s:openGitDiff('merge', s:getGitLatestMerge("HEAD"), '')
       endif
     elseif s:isHg()
-      call s:notSupported("Mercurial")
-"     let rev = get(s:getHgRevisions('--branch .'), -1, '')
-"     if rev != ''
-"       call s:openHgDiff('merge', rev, '')
-"     endif
+      " TODO: if a Mercurial merge is not in progress, then diff with the most recent p2
+      " on the current branch
+      call s:openHgDiff('parent2', 'p2()', '')
     else
       call s:notRepository(expand('%'))
     endif
