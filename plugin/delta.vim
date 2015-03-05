@@ -1044,16 +1044,9 @@ func s:getGitRevisionInfo(refspec)
   let lines = split(system(s:expandPath('cd %% >/dev/null && git log -1 --format="%h%n%H%n%ai%n%an%n%ae%nSUMMARY%n%s%nBODY%n%b" '.shellescape(a:refspec), s:getFileWorkingDirectory())), "\n")
   if !s:displayGitError('Could not get information for refspec "'.a:refspec.'"', lines)
     if len(lines) == 0
-      echohl ErrorMsg
-      echomsg 'Revision "'.a:refspec.'" does not exist'
-      echohl None
+      call s:displayError('', ['Revision "'.a:refspec.'" does not exist'])
     elseif len(lines) < 7 || lines[5] != 'SUMMARY' || lines[7] != 'BODY'
-      echohl ErrorMsg
-      echomsg 'Malformed output from "git log":'
-      echohl None
-      for line in lines
-        echomsg line
-      endfor
+      call s:displayError('Malformed output from "git log":', lines)
     else
       let info.ahash = remove(lines, 0)
       let info.hash = remove(lines, 0)
@@ -1188,16 +1181,9 @@ func s:getHgRevisionInfo(rev)
   let lines = split(system('cd '.shellescape(dir).' >/dev/null && hg --config defaults.log= log --template "{rev}\n{node}\n{node|short}\n{branches}\n{parents}\n{tags}\n{author}\n{author|user}\n{date|date}\n{date|isodate}\n{date|shortdate}\nDESCRIPTION\n{desc}\n" --rev '.shellescape(a:rev)), "\n")
   if !s:displayHgError('Could not get information for revision "'.a:rev.'"', lines)
     if len(lines) == 0
-      echohl ErrorMsg
-      echomsg 'Revision "'.a:rev.'" does not exist'
-      echohl None
+      call s:displayError('', ['Revision "'.a:rev.'" does not exist'])
     elseif len(lines) < 13 || lines[11] != 'DESCRIPTION'
-      echohl ErrorMsg
-      echomsg 'Malformed output from "hg log":'
-      echohl None
-      for line in lines
-        echomsg line
-      endfor
+      call s:displayError('Malformed output from "hg log":', lines)
     else
       let info.rev = remove(lines, 0)
       let info.node = remove(lines, 0)
