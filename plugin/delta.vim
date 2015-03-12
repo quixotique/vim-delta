@@ -400,6 +400,9 @@ endfunc
 func s:openMergeCommonAncestorDiff()
   try
     if s:isGit()
+      if !s:isGitWorkingMerge()
+        call s:notMerging()
+      endif
       call s:openGitDiff('ancestor', ':1', '')
     elseif s:isHg()
       if !s:isHgWorkingMerge()
@@ -496,8 +499,8 @@ func s:displayError(message, lines)
   endif
 endfunc
 
-func s:notMerging(path)
-  call s:displayError('', ["Not available unless merging")])
+func s:notMerging()
+  call s:displayError('', ["Not available unless merging"])
   throw "VimDelta:notmerge"
 endfunc
 
