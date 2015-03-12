@@ -505,7 +505,7 @@ func s:notMerging()
 endfunc
 
 func s:notRepository(path)
-  call s:displayError('', ["Not in repository".(a:path != '' ? ": ".a:path : "")])
+  call s:displayError('', ["Not in any repository".(a:path != '' ? ": ".a:path : "")])
   throw "VimDelta:norepo"
 endfunc
 
