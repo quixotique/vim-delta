@@ -38,7 +38,10 @@ endif
 
 " Save the <Leader> char as it was when the mappings were defined, so the help
 " message can quote the correct key sequences even if mapleader gets changed.
-let s:helpleader = g:mapleader
+let s:helpleader = '\'
+if exists("g:mapleader") && g:mapleader != ''
+  let s:helpleader = g:mapleader
+endif
 " TODO This should be integrated into the Vim help system.
 func s:help()
   " TODO Adapt this message to the current window width
