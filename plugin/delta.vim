@@ -828,11 +828,11 @@ func s:openLog()
       " read the mercurial log into it -- all ancestors of the current working revision
       if s:isHgWorkingMerge(realfiledir)
         " if currently merging, show '1' and '2' flags to indicate which revisions contributed to each parent
-        silent exe '$read !'.s:expandPath('cd %%:h:S >/dev/null && hg --config defaults.log= log --rev "ancestors(p1())-ancestors(ancestor(p1(),p2()))" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}|1 +{parents}|{desc|firstline}\n" %%:t:S', realfilepath)
-        silent exe '$read !'.s:expandPath('cd %%:h:S >/dev/null && hg --config defaults.log= log --rev "ancestors(p2())-ancestors(ancestor(p1(),p2()))" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}| 2+{parents}|{desc|firstline}\n" %%:t:S', realfilepath)
-        silent exe '$read !'.s:expandPath('cd %%:h:S >/dev/null && hg --config defaults.log= log --rev "ancestors(ancestor(p1(),p2()))" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}|12+{parents}|{desc|firstline}\n" %%:t:S', realfilepath)
+        silent exe '$read !'.s:expandPath('cd %%:h:S >/dev/null && hg --config defaults.log= log --follow --rev "ancestors(p1())-ancestors(ancestor(p1(),p2()))" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}|1 +{parents}|{desc|firstline}\n" %%:t:S', realfilepath)
+        silent exe '$read !'.s:expandPath('cd %%:h:S >/dev/null && hg --config defaults.log= log --follow --rev "ancestors(p2())-ancestors(ancestor(p1(),p2()))" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}| 2+{parents}|{desc|firstline}\n" %%:t:S', realfilepath)
+        silent exe '$read !'.s:expandPath('cd %%:h:S >/dev/null && hg --config defaults.log= log --follow --rev "ancestors(ancestor(p1(),p2()))" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}|12+{parents}|{desc|firstline}\n" %%:t:S', realfilepath)
       else
-        silent exe '$read !'.s:expandPath('cd %%:h:S >/dev/null && hg --config defaults.log= log --rev "ancestors(parents())" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}|+{parents}|{desc|firstline}\n" %%:t:S', realfilepath)
+        silent exe '$read !'.s:expandPath('cd %%:h:S >/dev/null && hg --config defaults.log= log --follow --rev "ancestors(parents())" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}|+{parents}|{desc|firstline}\n" %%:t:S', realfilepath)
       endif
       if s:displayHgError('Cannot read Mercurial log', getline(1,'$'))
         call s:closeLog()
@@ -1221,8 +1221,8 @@ endfunc
 " hg log options, in reverse chronological order (most recent first).
 func s:getHgRevisions(hgLogOpts)
   let dir = s:getFileWorkingDirectory()
-  let lines = split(system('cd '.shellescape(dir).' >/dev/null  && hg --config defaults.log= log --template "{node}\n" '.a:hgLogOpts), "\n")
-  if s:displayHgError('Could not get revisions from "hg log '.a:hgLogOpts.'"', lines)
+  let lines = split(system('cd '.shellescape(dir).' >/dev/null  && hg --config defaults.log= log --follow --template "{node}\n" '.a:hgLogOpts), "\n")
+  if s:displayHgError('Could not get revisions from "hg log --follow '.a:hgLogOpts.'"', lines)
     throw "VimDelta:commandfail"
   endif
   return lines
