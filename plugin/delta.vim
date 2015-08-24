@@ -700,7 +700,7 @@ func s:expandPath(text, path)
   " In Vim 7.4, a bug in fnamemodify() fails when the modifiers are ':h:S' and
   " the path ends in '.h'.  We work around it by invoking fnamemodify() twice,
   " once for the ':h' and once for the ':S'
-  return substitute(a:text, '%%\(\%(:[ht~.]\)\?\)\(\%(:S\)\?\)', '\=fnamemodify(fnamemodify(a:path, submatch(1)), submatch(2))', "g")
+  return substitute(a:text, '%%\(\%(:[ht~.]\)\?\)\(\%(:S\)\?\)', '\=fnameescape(fnamemodify(fnamemodify(a:path, submatch(1)), submatch(2)))', "g")
 endfunc
 
 " Put the focus in the original diff file window and return 1 if it exists.
