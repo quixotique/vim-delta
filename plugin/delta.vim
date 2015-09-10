@@ -807,7 +807,7 @@ func s:openLog()
       if s:isGitWorkingMerge(realfiledir)
         let heads = "HEAD MERGE_HEAD"
       endif
-      silent exe '$read !'.s:expandPath("cd %%:h:S >/dev/null && git log --graph --format='format:\\%h|\\%ai|\\%an|\\%s' ".heads." -- %%:t:S", realfilepath)
+      silent exe '$read !'.s:expandPath("cd %%:h:S >/dev/null && git log --follow --format='format:\\%h|\\%ai|\\%an|\\%s' ".heads." -- %%:t:S", realfilepath)
       if s:displayGitError('Cannot read Git log', getline(1,'$'))
         call s:closeLog()
         return
