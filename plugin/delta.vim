@@ -282,7 +282,7 @@ endfunc
 
 func s:openWorkingDiff()
   try
-    call s:openDiff('working', '!cat %%', '', '', '')
+    call s:openDiff('working', '!cat %%:E', '', '', '')
   endtry
 endfunc
 
@@ -489,6 +489,20 @@ endfunc
 " ------------------------------------------------------------------------------
 " PRIVATE FUNCTIONS
 
+" Expand a path into an absolute real path, without treating '~' and
+" '~username' specially.  This function is needed to overcome shortcomings of
+" resolve() and expand('%:p').
+func s:abspath(path)
+  let path = a:path
+  if path == '/'
+    return '/'
+  endif
+  if path[0] == '~'
+    let path = './'.path
+  endif
+  return resolve(fnamemodify(path, ':p'))
+endfunc
+
 func s:displayError(message, lines)
   if a:message != ''
     echohl ErrorMsg
@@ -522,31 +536,34 @@ endfunc
 " buffer's 'fileDir' variable, if set, otherwise we use the directory of the
 " file being edited if there is one, otherwise we use the current working directory.
 func s:getFileWorkingDirectory(...)
+" echomsg "getFileWorkingDirectory()"
   if a:0 > 1
-    let path = resolve(fnamemodify(a:1, ':p'))
+    let path = s:abspath(a:1)
 "   echomsg "getFileWorkingDirectory: a:1=".a:1." path=".path
     return isdirectory(path) ? path : fnamemodify(path, ':h')
   elseif exists('b:fileDir')
-"   echomsg "getFileWorkingDirectory: b:fileDir=".b:fileDir
-    return b:fileDir
+"   echomsg "getFileWorkingDirectory: s:abspath(b:fileDir)=".s:abspath(b:fileDir)
+    return s:abspath(b:fileDir)
   elseif expand('%') != ''
-"   echomsg "getFileWorkingDirectory: fnamemodify(resolve(expand('%:p')),':h')=".fnamemodify(resolve(expand('%:p')),':h')
-    return fnamemodify(resolve(expand('%:p')), ':h')
+"   echomsg "getFileWorkingDirectory: expand('%')=".expand('%')
+"   echomsg "getFileWorkingDirectory: fnamemodify(s:abspath(expand('%')),':h')=".fnamemodify(s:abspath(expand('%')),':h')
+    return fnamemodify(s:abspath(expand('%')), ':h')
   else
-"   echomsg "getFileWorkingDirectory: resolve(getcwd())=".resolve(getcwd())
-    return resolve(getcwd())
+"   echomsg "getFileWorkingDirectory: s:abspath(getcwd())=".s:abspath(getcwd())
+    return s:abspath(getcwd())
   endif
 endfunc
 
-" Return the current working file.  In diff and log windows, we use the buffer's 'filePath' variable, if set, otherwise
-" we use the current buffer's file name.
+" Return the current working file.  In diff and log windows, we use the
+" buffer's 'filePath' variable, if set, otherwise we use the current buffer's
+" file name.
 func s:getFilePath()
   if exists('b:filePath')
 "   echomsg "getFilePath: b:filePath=".b:filePath
     return b:filePath
   elseif expand('%') != ''
-"   echomsg "getFilePath: resolve(expand('%:p'))=".resolve(expand('%:p'))
-    return resolve(expand('%:p'))
+"   echomsg "getFilePath: s:abspath(expand('%'))=".s:abspath(expand('%'))
+    return s:abspath(expand('%'))
   endif
   throw "VimDelta:nofile"
 endfunc
@@ -617,9 +634,9 @@ func s:openDiff(diffname, readArg, rev, annotation, label)
       " turn off wrap mode in the original file buffer
       call s:setBufferWrapMode(0)
       let ft = &filetype
-      let readarg = s:expandPath(a:readArg, resolve(expand('%:p')))
+      let readarg = s:expandPath(a:readArg, s:abspath(expand('%')))
 "     echomsg "readarg=".string(readarg)
-      let realfilepath = resolve(expand('%:p'))
+      let realfilepath = s:abspath(expand('%'))
       let realfiledir = fnamemodify(realfilepath, ':h')
       set equalalways
       set eadirection=hor
@@ -695,12 +712,25 @@ endfunc
 "  - substitute all '%%' with 'path'
 "  - substitute all '%%:h' with the head of 'path'
 "  - substitute all '%%:t' with the tail of 'path'
-"  - escape shell metacharacters in a substituted value by appending ':S' to any of the above
+"  - escape shell metacharacters for passing to system() by appending ':S' to any of the above
+"  - escape Vim metacharacters (fnameescape()) for passing to :read by appending ':E' to any of the above
 func s:expandPath(text, path)
   " In Vim 7.4, a bug in fnamemodify() fails when the modifiers are ':h:S' and
   " the path ends in '.h'.  We work around it by invoking fnamemodify() twice,
   " once for the ':h' and once for the ':S'
-  return substitute(a:text, '%%\(\%(:[ht~.]\)\?\)\(\%(:S\)\?\)', '\=fnameescape(fnamemodify(fnamemodify(a:path, submatch(1)), submatch(2)))', "g")
+  return substitute(a:text, '%%\(\%(:[ht~.]\)\?\)\(\%(:[S]\)\?\)\(\%(:[E]\)\?\)', '\=s:expandPathSubstitute(a:path, submatch(1), submatch(2), submatch(3))', "g")
+endfunc
+func s:expandPathSubstitute(path, ...)
+" echomsg "expandPathSubstitute(path=".a:path." ...=".join(a:000, ",").")"
+  let path = a:path
+  for modifier in a:000
+    if modifier == ':E'
+      let path = fnameescape(path)
+    elseif modifier != ''
+      let path = fnamemodify(path, modifier)
+    endif
+  endfor
+  return path
 endfunc
 
 " Put the focus in the original diff file window and return 1 if it exists.
@@ -774,121 +804,123 @@ endfunc
 " Open a new window containing the log history of the current file.
 "
 func s:openLog()
-  " close the log window if it already exists
-  call s:closeLog()
-  " first switch to the original diff buffer, if there is one, otherwise operate
-  " on the current buffer
-  if exists('t:origDiffBuffer') && bufwinnr(t:origDiffBuffer) != -1
-    exe t:origDiffBuffer 'buffer'
-  endif
-  " only proceed for normal buffers
-  if &buftype == ''
-    " figure out the file name and number of the current buffer
-    let t:origDiffBuffer = bufnr("%")
-    let filepath = expand('%')
-    let realfilepath = resolve(expand('%:p'))
-    let realfiledir = fnamemodify(realfilepath, ':h')
-    " save the current wrap modes to restore them later
-    call s:recordWrapMode()
-    augroup DeltaVim
-      " When the source file's buffer ceases to be visible in any window, close
-      " all associated buffers, including the log buffer.
-      autocmd BufWinLeave <buffer> nested call s:closeAll()
-    augroup END
-    " create the log navigation window
-    botright 10 new
-    let t:logBuffer = bufnr('%')
-    let b:fileDir = realfiledir
-    " give the buffer a helpful name
-    silent exe 'file' fnameescape('log '.filepath)
-    if s:isGit(realfiledir)
-      " read the Git log into it -- all ancestors of the current working revision
-      let heads = "HEAD"
-      if s:isGitWorkingMerge(realfiledir)
-        let heads = "HEAD MERGE_HEAD"
-      endif
-      silent exe '$read !'.s:expandPath("cd %%:h:S >/dev/null && git log --follow --format='format:\\%h|\\%ai|\\%an|\\%s' ".heads." -- %%:t:S", realfilepath)
-      if s:displayGitError('Cannot read Git log', getline(1,'$'))
-        call s:closeLog()
-        return
-      endif
-      1d
-      " justify the first column (graph number)
-      let w = max([4, max(map(getline(1,'$'), "len(substitute(v:val, '\\x.*$', '', ''))"))])
-      silent g/\x\{6,\}|/s/^\X*/\=submatch(0).repeat(' ', w-len(submatch(0)))/e
-      " remove seconds from the date column
-      silent g/^\(\X*\x\{6,\}|\)\(\d\d\d\d-\d\d-\d\d \d\d:\d\d\):\d\d/s//\1\2/e
-      " remove timezone from the date column
-      "silent g/^\(\%([^|]*|\)\{1\}\)\([^|]*\) +\d\d\d\d|/s//\1\2|/e
-      " justify/truncate the username column
-      silent g/^\(\X*\x\{6,\}|[^|]*|\)\([^|]*\)/s//\=submatch(1).strpart(submatch(2),0,16).repeat(' ', 16-len(submatch(2)))/e
-      setlocal filetype=gitlogcompact
-      set syntax=gitlogcompact
-    elseif s:isHg(realfiledir)
-      " read the mercurial log into it -- all ancestors of the current working revision
-      if s:isHgWorkingMerge(realfiledir)
-        " if currently merging, show '1' and '2' flags to indicate which revisions contributed to each parent
-        silent exe '$read !'.s:expandPath('cd %%:h:S >/dev/null && hg --config defaults.log= log --follow --rev "ancestors(p1())-ancestors(ancestor(p1(),p2()))" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}|1 +{parents}|{desc|firstline}\n" %%:t:S', realfilepath)
-        silent exe '$read !'.s:expandPath('cd %%:h:S >/dev/null && hg --config defaults.log= log --follow --rev "ancestors(p2())-ancestors(ancestor(p1(),p2()))" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}| 2+{parents}|{desc|firstline}\n" %%:t:S', realfilepath)
-        silent exe '$read !'.s:expandPath('cd %%:h:S >/dev/null && hg --config defaults.log= log --follow --rev "ancestors(ancestor(p1(),p2()))" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}|12+{parents}|{desc|firstline}\n" %%:t:S', realfilepath)
-      else
-        silent exe '$read !'.s:expandPath('cd %%:h:S >/dev/null && hg --config defaults.log= log --follow --rev "ancestors(parents())" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}|+{parents}|{desc|firstline}\n" %%:t:S', realfilepath)
-      endif
-      if s:displayHgError('Cannot read Mercurial log', getline(1,'$'))
-        call s:closeLog()
-        return
-      endif
-      1d
-      " sort by reverse date (most recent first)
-      sort! /^\([^|]*|\)\{2\}/
-      " justify the first column (rev number)
-      silent %s@^\d\+@\=submatch(0).repeat(' ', 6-len(submatch(0)))@e
-      " clean up the date column
-      silent %s@^\(\%([^|]*|\)\{2\}\)\([^|]*\) +\d\d\d\d|@\1\2|@e
-      " justify/truncate the username column
-      silent %s@^\(\%([^|]*|\)\{3\}\)\([^|]*\)@\=submatch(1).strpart(submatch(2),0,10).repeat(' ', 10-len(submatch(2)))@e
-      " justify/truncate the branch column
-      silent %s@^\(\%([^|]*|\)\{4\}\)\([^|]*\)@\=submatch(1).strpart(submatch(2),0,30).repeat(' ', 30-len(submatch(2)))@e
-      " condense the parents column into "M" flag
-      silent %s@^\(\%([^|]*|\)\{5\}\)\([^+]*+\)\([^|]*\)@\=submatch(1).submatch(2)[:-2].call('s:hgMergeFlag', [submatch(3)])@e
-      setlocal filetype=hglogcompact
-      set syntax=hglogcompact
-    else
-      try
-        call s:notRepository(realfiledir)
-      catch /^VimDelta:norepo/
-      finally
-        call s:closeLog()
-      endtry
-      return
+  try
+    " close the log window if it already exists
+    call s:closeLog()
+    " first switch to the original diff buffer, if there is one, otherwise operate
+    " on the current buffer
+    if exists('t:origDiffBuffer') && bufwinnr(t:origDiffBuffer) != -1
+      exe t:origDiffBuffer 'buffer'
     endif
-    " go the first line (most recent revision)
-    1
-    " set the buffer properties
-    call s:setBufferWrapMode(0)
-    setlocal buftype=nofile
-    setlocal nomodifiable
-    setlocal noswapfile
-    setlocal bufhidden=delete
-    setlocal winfixheight
-    " Set up some useful key mappings.
-    " (Vim used to fail to synchronise the scrolling of the diff windows, so after :call
-    " <SID>openLogRevisionDiffs(...)<CR> the following incantation was used: 0kj
-    " but that had the unfortunate side effect of erasing any error message shown in the
-    " status line.  No longer needed in Vim 7.4.)
-    nnoremap <buffer> <silent> <CR> 10_:call <SID>openLogRevisionDiffs(0)<CR>
-    vnoremap <buffer> <silent> <CR> 10_:<C-U>call <SID>openLogRevisionDiffs(1)<CR>
-    nnoremap <buffer> <silent> - 5-
-    nnoremap <buffer> <silent> + 5+
-    nnoremap <buffer> <silent> _ _
-    nnoremap <buffer> <silent> = 10_
-    nnoremap <buffer> <silent> m :call <SID>gotoOrigWindow()<CR>
-    nnoremap <buffer> <silent> q :call <SID>closeLog()<CR>
-    " housekeeping for buffer close
-    augroup DeltaVim
-      autocmd BufDelete <buffer> call s:cleanUpLog()
-    augroup END
-  endif
+    " only proceed for normal buffers
+    if &buftype == ''
+      " figure out the file name and number of the current buffer
+      let t:origDiffBuffer = bufnr("%")
+      let filepath = expand('%')
+      let realfilepath = s:abspath(expand('%'))
+      let realfiledir = fnamemodify(realfilepath, ':h')
+      " save the current wrap modes to restore them later
+      call s:recordWrapMode()
+      augroup DeltaVim
+        " When the source file's buffer ceases to be visible in any window, close
+        " all associated buffers, including the log buffer.
+        autocmd BufWinLeave <buffer> nested call s:closeAll()
+      augroup END
+      " create the log navigation window
+      botright 10 new
+      let t:logBuffer = bufnr('%')
+      let b:fileDir = realfiledir
+      " give the buffer a helpful name
+      silent exe 'file' fnameescape('log '.filepath)
+      if s:isGit(realfiledir)
+        " read the Git log into it -- all ancestors of the current working revision
+        let heads = "HEAD"
+        if s:isGitWorkingMerge(realfiledir)
+          let heads = "HEAD MERGE_HEAD"
+        endif
+        let command = s:expandPath("cd %%:h:E >/dev/null && git log --follow --format='format:\\%h|\\%ai|\\%an|\\%s' ".heads." -- %%:t:S", realfilepath)
+        silent exe '$read !'.command
+        if s:displayGitError('Cannot read Git log', getline(1,'$'))
+          call s:closeLog()
+          return
+        endif
+        1d
+        " justify the first column (graph number)
+        let w = max([4, max(map(getline(1,'$'), "len(substitute(v:val, '\\x.*$', '', ''))"))])
+        silent g/\x\{6,\}|/s/^\X*/\=submatch(0).repeat(' ', w-len(submatch(0)))/e
+        " remove seconds from the date column
+        silent g/^\(\X*\x\{6,\}|\)\(\d\d\d\d-\d\d-\d\d \d\d:\d\d\):\d\d/s//\1\2/e
+        " remove timezone from the date column
+        "silent g/^\(\%([^|]*|\)\{1\}\)\([^|]*\) +\d\d\d\d|/s//\1\2|/e
+        " justify/truncate the username column
+        silent g/^\(\X*\x\{6,\}|[^|]*|\)\([^|]*\)/s//\=submatch(1).strpart(submatch(2),0,16).repeat(' ', 16-len(submatch(2)))/e
+        setlocal filetype=gitlogcompact
+        set syntax=gitlogcompact
+      elseif s:isHg(realfiledir)
+        " read the mercurial log into it -- all ancestors of the current working revision
+        if s:isHgWorkingMerge(realfiledir)
+          " if currently merging, show '1' and '2' flags to indicate which revisions contributed to each parent
+          silent exe '$read !'.s:expandPath('cd %%:h:E >/dev/null && hg --config defaults.log= log --follow --rev "ancestors(p1())-ancestors(ancestor(p1(),p2()))" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}|1 +{parents}|{desc|firstline}\n" %%:t:E', realfilepath)
+          silent exe '$read !'.s:expandPath('cd %%:h:E >/dev/null && hg --config defaults.log= log --follow --rev "ancestors(p2())-ancestors(ancestor(p1(),p2()))" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}| 2+{parents}|{desc|firstline}\n" %%:t:E', realfilepath)
+          silent exe '$read !'.s:expandPath('cd %%:h:E >/dev/null && hg --config defaults.log= log --follow --rev "ancestors(ancestor(p1(),p2()))" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}|12+{parents}|{desc|firstline}\n" %%:t:E', realfilepath)
+        else
+          silent exe '$read !'.s:expandPath('cd %%:h:E >/dev/null && hg --config defaults.log= log --follow --rev "ancestors(parents())" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}|+{parents}|{desc|firstline}\n" %%:t:E', realfilepath)
+        endif
+        if s:displayHgError('Cannot read Mercurial log', getline(1,'$'))
+          call s:closeLog()
+          return
+        endif
+        1d
+        " sort by reverse date (most recent first)
+        sort! /^\([^|]*|\)\{2\}/
+        " justify the first column (rev number)
+        silent %s@^\d\+@\=submatch(0).repeat(' ', 6-len(submatch(0)))@e
+        " clean up the date column
+        silent %s@^\(\%([^|]*|\)\{2\}\)\([^|]*\) +\d\d\d\d|@\1\2|@e
+        " justify/truncate the username column
+        silent %s@^\(\%([^|]*|\)\{3\}\)\([^|]*\)@\=submatch(1).strpart(submatch(2),0,10).repeat(' ', 10-len(submatch(2)))@e
+        " justify/truncate the branch column
+        silent %s@^\(\%([^|]*|\)\{4\}\)\([^|]*\)@\=submatch(1).strpart(submatch(2),0,30).repeat(' ', 30-len(submatch(2)))@e
+        " condense the parents column into "M" flag
+        silent %s@^\(\%([^|]*|\)\{5\}\)\([^+]*+\)\([^|]*\)@\=submatch(1).submatch(2)[:-2].call('s:hgMergeFlag', [submatch(3)])@e
+        setlocal filetype=hglogcompact
+        set syntax=hglogcompact
+      else
+        call s:notRepository(realfiledir)
+        return
+      endif
+      " go the first line (most recent revision)
+      1
+      " set the buffer properties
+      call s:setBufferWrapMode(0)
+      setlocal buftype=nofile
+      setlocal nomodifiable
+      setlocal noswapfile
+      setlocal bufhidden=delete
+      setlocal winfixheight
+      " Set up some useful key mappings.
+      " (Vim used to fail to synchronise the scrolling of the diff windows, so after :call
+      " <SID>openLogRevisionDiffs(...)<CR> the following incantation was used: 0kj
+      " but that had the unfortunate side effect of erasing any error message shown in the
+      " status line.  No longer needed in Vim 7.4.)
+      nnoremap <buffer> <silent> <CR> 10_:call <SID>openLogRevisionDiffs(0)<CR>
+      vnoremap <buffer> <silent> <CR> 10_:<C-U>call <SID>openLogRevisionDiffs(1)<CR>
+      nnoremap <buffer> <silent> - 5-
+      nnoremap <buffer> <silent> + 5+
+      nnoremap <buffer> <silent> _ _
+      nnoremap <buffer> <silent> = 10_
+      nnoremap <buffer> <silent> m :call <SID>gotoOrigWindow()<CR>
+      nnoremap <buffer> <silent> q :call <SID>closeLog()<CR>
+      " housekeeping for buffer close
+      augroup DeltaVim
+        autocmd BufDelete <buffer> call s:cleanUpLog()
+      augroup END
+    endif
+  catch /^VimDelta:norepo/
+    call s:closeLog()
+  catch /^VimDelta:commandfail/
+    call s:closeLog()
+  endtry
 endfunc
 
 " Called when the log buffer is about to be deleted.
@@ -1030,7 +1062,7 @@ endfunc
 " PRIVATE FUNCTIONS - Git
 
 func s:isGit(...)
-  return findfile('.git/config', call('s:getFileWorkingDirectory', a:000).';') != ''
+  return findfile('.git/config', fnamemodify(call('s:getFileWorkingDirectory', a:000), ':gs/ /\\ /').';') != ''
 endfunc
 
 " If the given Git output lines contain any error message, or the command
@@ -1040,7 +1072,7 @@ endfunc
 func s:displayGitError(message, lines)
   let errorlines = filter(copy(a:lines), 'v:val =~ "^fatal:"')
   if v:shell_error || len(errorlines)
-    s:displayError(a:message, errorlines)
+    call s:displayError(a:message, errorlines)
     return 1
   endif
   return 0
@@ -1049,7 +1081,8 @@ endfunc
 " Return much information about a specific Git commit.
 func s:getGitRevisionInfo(refspec)
   let info = {}
-  let lines = split(system(s:expandPath('cd %% >/dev/null && git log -1 --format="%h%n%H%n%ai%n%an%n%ae%nSUMMARY%n%s%nBODY%n%b" '.shellescape(a:refspec), s:getFileWorkingDirectory())), "\n")
+  let command = s:expandPath('cd %%:S >/dev/null && git log -1 --format="%h%n%H%n%ai%n%an%n%ae%nSUMMARY%n%s%nBODY%n%b" '.shellescape(a:refspec), s:getFileWorkingDirectory())
+  let lines = split(system(command), "\n")
   if !s:displayGitError('Could not get information for refspec "'.a:refspec.'"', lines)
     if len(lines) == 0
       call s:displayError('', ['Revision "'.a:refspec.'" does not exist'])
@@ -1083,7 +1116,8 @@ endfunc
 " Return commit ref of fork point of current branch from given trunk
 func s:getGitForkPoint(trunkref)
   let ref = ''
-  let lines = split(system(s:expandPath('cd %% >/dev/null && git merge-base --fork-point '.shellescape(a:trunkref), s:getFileWorkingDirectory())), "\n")
+  let command = s:expandPath('cd %%:S >/dev/null && git merge-base --fork-point ', s:getFileWorkingDirectory()).shellescape(a:trunkref)
+  let lines = split(system(command), "\n")
   if s:displayGitError('Could not get fork-point for trunk "'.a:trunkref.'"', lines)
     throw "VimDelta:commandfail"
   endif
@@ -1103,7 +1137,8 @@ endfunc
 " Return commit ref of most recent merge at or before given commit
 func s:getGitLatestMerge(ref)
   let ref = ''
-  let lines = split(system(s:expandPath('cd %% >/dev/null && git rev-list -n1 --min-parents=2 '.shellescape(a:ref), s:getFileWorkingDirectory())), "\n")
+  let command = s:expandPath('cd %%:S >/dev/null && git rev-list -n1 --min-parents=2 '.shellescape(a:ref), s:getFileWorkingDirectory())
+  let lines = split(system(command), "\n")
   if s:displayGitError('Could not get latest merge before '.a:ref, lines)
     throw "VimDelta:commandfail"
   endif
@@ -1139,14 +1174,15 @@ func s:openGitDiff(diffname, refspec, label)
     endif
   endif
   try
-    call s:openDiff(a:diffname, '!cd %%:h >/dev/null && git show '.shellescape(a:refspec).':./%%:t', hash, annotation, a:label)
+    call s:openDiff(a:diffname, '!cd %%:h:E >/dev/null && git show '.fnameescape(a:refspec).':./%%:t:E', hash, annotation, a:label)
   endtry
 endfunc
 
 " Return 1 if the current Git working directory is a merge (has any staged files).
 func s:isGitWorkingMerge(...)
-  let lines = split(system(s:expandPath('cd %%:S >/dev/null && git ls-files --stage', call('s:getFileWorkingDirectory', a:000))), "\n")
-  if s:displayGitError('Failed command: git ls-files', lines)
+  let command = s:expandPath('cd %%:S >/dev/null && git ls-files --stage', call('s:getFileWorkingDirectory', a:000))
+  let lines = split(system(command), "\n")
+  if s:displayGitError('Failed command: '.command, lines)
     throw "VimDelta:commandfail"
   endif
   let nstaged = 0
@@ -1166,7 +1202,7 @@ endfunc
 " PRIVATE FUNCTIONS - Mercurial
 
 func s:isHg(...)
-  return findfile('.hg/hgrc', call('s:getFileWorkingDirectory', a:000).';') != ''
+  return findfile('.hg/hgrc', fnamemodify(call('s:getFileWorkingDirectory', a:000), ':gs/ /\\ /').';') != ''
 endfunc
 
 " If the given Mercurial output lines contain any error message, or the command
@@ -1277,14 +1313,15 @@ func s:openHgDiff(diffname, rev, label)
   endif
   let annotation = info.shortnode.' '.info.shortdate
   try
-    call s:openDiff(a:diffname, '!cd %%:h:S >/dev/null && hg --config defaults.cat= cat -r '.shellescape(info.rev).' %%:t:S', info.rev, annotation, a:label)
+    call s:openDiff(a:diffname, '!cd %%:h:E >/dev/null && hg --config defaults.cat= cat -r '.shellescape(info.rev).' %%:t:E', info.rev, annotation, a:label)
   endtry
 endfunc
 
 " Return 1 if the current Mercurial working directory is a merge (has two parents).
 func s:isHgWorkingMerge(...)
-  let parents = split(system(s:expandPath('cd %%:S >/dev/null && hg --config defaults.parents= parents --template "{node}\n"', call('s:getFileWorkingDirectory', a:000))), "\n")
-  if s:displayHgError('Failed command: hg parents', parents)
+  let command = s:expandPath('cd %%:S >/dev/null && hg --config defaults.parents= parents --template "{node}\n"', call('s:getFileWorkingDirectory', a:000))
+  let parents = split(system(command), "\n")
+  if s:displayHgError('Failed command: '.command, parents)
     throw "VimDelta:commandfail"
   endif
   if len(parents) == 2
