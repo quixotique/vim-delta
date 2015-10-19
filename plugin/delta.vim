@@ -638,6 +638,7 @@ func s:openDiff(diffname, readArg, rev, annotation, label)
 "     echomsg "readarg=".string(readarg)
       let realfilepath = s:abspath(expand('%'))
       let realfiledir = fnamemodify(realfilepath, ':h')
+      let abbrfilepath = fnamemodify(realfilepath, ':~:.')
       set equalalways
       set eadirection=hor
       vnew
@@ -648,7 +649,7 @@ func s:openDiff(diffname, readArg, rev, annotation, label)
       " turn off wrap mode in the new diff buffer
       call s:setBufferWrapMode(0)
       exe 'let' varname "=" bufnr("%")
-      let displayName = expand('%')
+      let displayName = abbrfilepath
       if a:annotation != ''
         let displayName .= ' '.a:annotation
       endif
