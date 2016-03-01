@@ -864,16 +864,23 @@ func s:openLog()
           silent exe '$read !'.s:expandPath('cd %%:h:E >/dev/null && hg --config defaults.log= log --follow --rev "ancestors(p1())-ancestors(ancestor(p1(),p2()))" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}|1 +{parents}|{desc|firstline}\n" %%:t:E', realfilepath)
           silent exe '$read !'.s:expandPath('cd %%:h:E >/dev/null && hg --config defaults.log= log --follow --rev "ancestors(p2())-ancestors(ancestor(p1(),p2()))" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}| 2+{parents}|{desc|firstline}\n" %%:t:E', realfilepath)
           silent exe '$read !'.s:expandPath('cd %%:h:E >/dev/null && hg --config defaults.log= log --follow --rev "ancestors(ancestor(p1(),p2()))" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}|12+{parents}|{desc|firstline}\n" %%:t:E', realfilepath)
+          1d
+          if s:displayHgError('Cannot read Mercurial log', getline(1,'$'))
+            call s:closeLog()
+            return
+          endif
+          " sort by date
+          sort /^\([^|]*|\)\{2\}/
         else
           silent exe '$read !'.s:expandPath('cd %%:h:E >/dev/null && hg --config defaults.log= log --follow --rev "ancestors(parents())" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}|+{parents}|{desc|firstline}\n" %%:t:E', realfilepath)
+          1d
+          if s:displayHgError('Cannot read Mercurial log', getline(1,'$'))
+            call s:closeLog()
+            return
+          endif
         endif
-        if s:displayHgError('Cannot read Mercurial log', getline(1,'$'))
-          call s:closeLog()
-          return
-        endif
-        1d
-        " sort by reverse date (most recent first)
-        sort! /^\([^|]*|\)\{2\}/
+        " reverse order (most recent first)
+        g/^/m0
         " justify the first column (rev number)
         silent %s@^\d\+@\=submatch(0).repeat(' ', 6-len(submatch(0)))@e
         " clean up the date column
