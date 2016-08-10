@@ -871,6 +871,8 @@ func s:openLog()
           endif
           " sort by date
           sort /^\([^|]*|\)\{2\}/
+          " reverse order (most recent first)
+          g/^/m0
         else
           silent exe '$read !'.s:expandPath('cd %%:h:E >/dev/null && hg --config defaults.log= log --follow --rev "ancestors(parents())" --template "{rev}|{node|short}|{date|isodate}|{author|user}|{branch}|+{parents}|{desc|firstline}\n" %%:t:E', realfilepath)
           1d
@@ -879,8 +881,6 @@ func s:openLog()
             return
           endif
         endif
-        " reverse order (most recent first)
-        g/^/m0
         " justify the first column (rev number)
         silent %s@^\d\+@\=submatch(0).repeat(' ', 6-len(submatch(0)))@e
         " clean up the date column
