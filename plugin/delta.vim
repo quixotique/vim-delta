@@ -59,8 +59,6 @@ func s:help()
   echomsg m.'T                   Close the diff window opened with '.m.'t'
   echomsg m.'o   Branch origin   Open a new diff window on current branch origin (Hg only; earliest revision on current named branch)'
   echomsg m.'O                   Close the diff window opened with '.m.'o'
-  echomsg m.'r   Release         Open a new diff window on latest release (tag with "release" prefix or version number)'
-  echomsg m.'R                   Close the diff window opened with '.m.'r'
   echomsg m.'p   Prior release   Open a new diff window on prior release (tag with "release" prefix or version number)'
   echomsg m.'P                   Close the diff window opened with '.m.'p'
   echomsg m.'m   Merged          Open a new diff window on the revision most recently merged into the current branch'
@@ -126,12 +124,6 @@ if !exists('no_plugin_maps') && !exists('no_deltavim_plugin_maps')
   endif
   if !hasmapto('<Plug>DeltaVimCloseBranchOrigin')
     nmap <unique> <Leader>O <Plug>DeltaVimCloseBranchOrigin
-  endif
-  if !hasmapto('<Plug>DeltaVimOpenNewestRelease')
-    nmap <unique> <Leader>r <Plug>DeltaVimOpenNewestRelease
-  endif
-  if !hasmapto('<Plug>DeltaVimCloseNewestRelease')
-    nmap <unique> <Leader>R <Plug>DeltaVimCloseNewestRelease
   endif
   if !hasmapto('<Plug>DeltaVimOpenPriorRelease')
     nmap <unique> <Leader>p <Plug>DeltaVimOpenPriorRelease
